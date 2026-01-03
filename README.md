@@ -14,16 +14,27 @@
 **VRCPulse** is a high-performance Discord bot written in Rust.<br/>
 It monitors VRChat server status and provides real-time visualized dashboards.
 
+[![Add to Discord](https://img.shields.io/badge/Add%20to%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://vrcpulse.vrcdevs.com/install)
+
 [Documentation](./docs/README.md) · [Report Bug](https://github.com/hebububu/VRCPulse/issues) · [Request Feature](https://github.com/hebububu/VRCPulse/issues)
 
 </div>
 
+## 🎬 Demo
+
+<div align="center">
+<img src="./images/demo/command-status.webp" alt="Status Command Demo" width="600"/>
+</div>
+
 ## ✨ Features
 
-- **📊 Visualized Dashboard**: Generates real-time server latency charts using `plotters`.
-- **🤖 Automated Monitoring**: Periodic polling from VRChat Status API & CloudFront metrics.
-- **📢 Smart Alert System**: Instant notifications for official incidents and threshold-based user reports.
-- **⚙️ Easy Management**: Simple slash commands (`/config`, `/status`, `/report`).
+- **📊 Visualized Dashboard**: Real-time server metrics charts using `plotters`
+- **🤖 Automated Monitoring**: Periodic polling from VRChat Status API & CloudFront metrics
+
+## 🚧 Roadmap
+
+- **📢 User-Driven Alert System**: Threshold-based notifications and user reports
+- **⚙️ Guild Configuration**: Per-server settings and notification channels
 
 ## 🛠 Tech Stack
 
@@ -35,20 +46,25 @@ It monitors VRChat server status and provides real-time visualized dashboards.
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 1. Add Bot to Your Server
 
+[![Add to Discord](https://img.shields.io/badge/Add%20to%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://vrcpulse.vrcdevs.com/install)
+
+### 2. Run Your Own Bot
+
+**Prerequisites**
 - Rust (Latest Stable)
 - `sea-orm-cli` (`cargo install sea-orm-cli`)
 
-### Installation & Run
-
-1. `git clone https://github.com/hebu/VRCPulse.git`
-2. Create `.env`:
-   ```env
-   DISCORD_TOKEN=your_token
-   DATABASE_URL=sqlite://data.db?mode=rwc
-   ```
-3. `cargo run`
+**Installation & Run**
+```bash
+git clone https://github.com/Hebububu/VRCPulse.git
+cd VRCPulse
+cp .env.example .env
+# Edit .env with your Discord token
+sea-orm-cli migrate up
+cargo run
+```
 
 ---
 
@@ -58,14 +74,35 @@ It monitors VRChat server status and provides real-time visualized dashboards.
 
 ### 주요 기능
 
-- **시각화 대시보드**: 서버 지연 시간을 그래프로 생성하여 전송합니다.
-- **자동 모니터링**: 공식 API 및 메트릭 데이터를 주기적으로 수집합니다.
-- **스마트 알림**: 서버 장애 발생 시 설정된 채널로 즉시 알림을 발송합니다.
-- **간편한 설정**: 슬래시 명령어를 통해 채널 및 알림 주기를 관리할 수 있습니다.
+- **시각화 대시보드**: 서버 메트릭을 실시간 그래프로 생성합니다
+- **자동 모니터링**: VRChat Status API 및 CloudFront 메트릭을 주기적으로 수집합니다
+
+### 개발 예정
+
+- **사용자 기반 알림 시스템**: 임계값 기반 알림 및 사용자 리포트
+- **서버별 설정**: 서버별 설정 및 알림 채널 관리
 
 ### 시작하기
 
-상세한 설치 및 실행 방법은 상단의 [Getting Started](#-getting-started) 섹션을 참고해 주세요.
+#### 1. 서버에 봇 추가하기
+
+[![디스코드에 추가](https://img.shields.io/badge/디스코드에%20추가-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://vrcpulse.vrcdevs.com/install)
+
+#### 2. 직접 봇 실행하기
+
+**필수 조건**
+- Rust (최신 안정 버전)
+- `sea-orm-cli` (`cargo install sea-orm-cli`)
+
+**설치 및 실행**
+```bash
+git clone https://github.com/Hebububu/VRCPulse.git
+cd VRCPulse
+cp .env.example .env
+# .env 파일에 Discord 토큰 입력
+sea-orm-cli migrate up
+cargo run
+```
 
 ---
 
