@@ -12,7 +12,7 @@
 **VRCPulse** is a high-performance Discord bot written in Rust.<br/>
 It monitors VRChat server status and provides real-time visualized dashboards.
 
-[Documentation](./docs/README.md) · [Report Bug](https://github.com/hebu/VRCPulse/issues) · [Request Feature](https://github.com/hebu/VRCPulse/issues)
+[Documentation](./docs/README.md) · [Report Bug](https://github.com/hebububu/VRCPulse/issues) · [Request Feature](https://github.com/hebububu/VRCPulse/issues)
 
 </div>
 
