@@ -1,19 +1,19 @@
 use serde::Deserialize;
 
-/// 어플리케이션 환경변수 설정
+/// Application environment configuration
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// Discord 봇 토큰
+    /// Discord bot token
     pub discord_token: String,
-    /// 테스트 길드 ID (선택)
-    /// 설정 시 해당 길드에 즉시 슬래시 명령어 등록
+    /// Test guild ID (optional)
+    /// When set, registers slash commands to this guild immediately
     pub test_guild_id: Option<u64>,
-    /// SQLite 데이터베이스 연결 URL
+    /// SQLite database connection URL
     pub database_url: String,
 }
 
 impl Config {
-    /// 환경변수 로드 및 Config 생성
+    /// Load environment variables and create Config
     pub fn from_env() -> Result<Self, envy::Error> {
         if let Err(e) = dotenvy::dotenv() {
             eprintln!("Failed to load .env file: {e}");
@@ -22,7 +22,7 @@ impl Config {
         envy::from_env::<Config>()
     }
 
-    /// 필수 설정값 검증
+    /// Validate required configuration values
     pub fn validate(&self) {
         if self.discord_token.is_empty() {
             panic!("DISCORD_TOKEN is required");
@@ -33,7 +33,7 @@ impl Config {
         }
 
         if self.test_guild_id.is_some() {
-            eprintln!("ℹ️  TEST_GUILD_ID is set. Commands will be registered to this guild only.");
+            eprintln!("TEST_GUILD_ID is set. Commands will be registered to this guild only.");
         }
     }
 }

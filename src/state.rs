@@ -1,18 +1,18 @@
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
-/// 애플리케이션 전역 상태
-/// - Serenity 이벤트 핸들러에서 `TypeMap`을 통해 접근 가능
+/// Application global state
+/// - Accessible via `TypeMap` in Serenity event handlers
 #[derive(Clone)]
 pub struct AppState {
-    /// 데이터베이스 연결
+    /// Database connection
     pub database: Arc<DatabaseConnection>,
-    /// HTTP 클라이언트 (VRChat API 호출용)
+    /// HTTP client for VRChat API calls
     pub http_client: reqwest::Client,
 }
 
 impl AppState {
-    /// 새로운 AppState 인스턴스 생성
+    /// Create a new AppState instance
     pub fn new(database: DatabaseConnection) -> Self {
         let http_client = reqwest::Client::builder()
             .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
