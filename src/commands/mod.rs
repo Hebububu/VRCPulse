@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod hello;
+pub mod status;
 
 use serenity::all::{Command, Context, CreateCommand};
 use tracing::info;
@@ -8,6 +9,7 @@ use tracing::info;
 pub fn all() -> Vec<CreateCommand> {
     let mut commands = vec![hello::register()];
     commands.extend(admin::all());
+    commands.extend(status::all());
     commands
 }
 

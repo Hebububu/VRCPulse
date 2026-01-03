@@ -1,13 +1,11 @@
 use serenity::all::{
-    Colour, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, Permissions, ResolvedValue, Timestamp,
+    Colour, CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
+    Permissions, ResolvedValue, Timestamp,
 };
 use tracing::error;
 
-use crate::collector::config::{
-    get_interval, validate_interval, PollerType, DEFAULT_INTERVAL,
-};
+use crate::collector::config::{DEFAULT_INTERVAL, PollerType, get_interval, validate_interval};
 use crate::state::{AppState, AppStateKey};
 
 /// /admin config command definition
@@ -21,13 +19,11 @@ pub fn register() -> CreateCommand {
                 "config",
                 "Manage bot configuration",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::SubCommand,
-                    "show",
-                    "Display current polling interval settings",
-                ),
-            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "show",
+                "Display current polling interval settings",
+            ))
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::SubCommand,
@@ -57,13 +53,11 @@ pub fn register() -> CreateCommand {
                     .max_int_value(3600),
                 ),
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::SubCommand,
-                    "reset",
-                    "Reset all polling intervals to default (60s)",
-                ),
-            ),
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "reset",
+                "Reset all polling intervals to default (60s)",
+            )),
         )
 }
 
@@ -133,9 +127,7 @@ async fn handle_show(
         .field("Incident", format_interval(incident), true)
         .field("Maintenance", format_interval(maintenance), true)
         .field("Metrics", format_interval(metrics), true)
-        .footer(CreateEmbedFooter::new(
-            "Use /admin config set to change",
-        ));
+        .footer(CreateEmbedFooter::new("Use /admin config set to change"));
 
     let response = CreateInteractionResponseMessage::new().embed(embed);
     interaction

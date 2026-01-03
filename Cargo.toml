@@ -7,6 +7,8 @@ edition = "2024"
 chrono = { version = "0.4.42", features = ["serde"] }
 dotenvy = "0.15.7"
 envy = "0.4.2"
+plotters = { version = "0.3.7", default-features = false, features = ["bitmap_encoder", "line_series", "area_series", "bitmap_backend", "ttf"] }
+png = "0.18.0"
 reqwest = { version = "0.13.1", features = ["json"] }
 sea-orm = { version = "1.1.19", features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
 serde = { version = "1.0.228", features = ["derive"] }

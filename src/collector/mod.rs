@@ -11,7 +11,7 @@ use std::time::Duration;
 use reqwest::Client;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch;
-use tokio::time::{interval, Interval, MissedTickBehavior};
+use tokio::time::{Interval, MissedTickBehavior, interval};
 use tracing::{debug, error, info};
 
 pub use config::{CollectorConfigRx, CollectorConfigTx};

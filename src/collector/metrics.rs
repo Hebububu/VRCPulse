@@ -8,8 +8,8 @@ use tracing::{debug, warn};
 
 use crate::entity::metric_logs;
 
-use super::client::{fetch_json, metrics_api_url, Result};
-use super::models::{MetricDefinition, MetricsResponse, CLOUDFRONT_METRICS};
+use super::client::{Result, fetch_json, metrics_api_url};
+use super::models::{CLOUDFRONT_METRICS, MetricDefinition, MetricsResponse};
 
 /// Default interval for CloudFront metrics (60 seconds)
 const METRIC_INTERVAL_SEC: i64 = 60;

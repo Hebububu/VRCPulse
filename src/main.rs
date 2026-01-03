@@ -5,6 +5,7 @@ mod entity;
 mod error;
 mod logging;
 mod state;
+mod visualization;
 
 use config::Config;
 use error::Result;
@@ -47,6 +48,7 @@ impl EventHandler for Handler {
             let result = match command.data.name.as_str() {
                 "hello" => commands::hello::run(&ctx, &command).await,
                 "admin" => commands::admin::config::run(&ctx, &command).await,
+                "status" => commands::status::run(&ctx, &command).await,
                 _ => Ok(()),
             };
 
