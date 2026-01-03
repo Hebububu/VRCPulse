@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./images/VRCPulse.png" alt="VRCPulse Logo" width="200"/>
+
 # VRCPulse
 
 [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
