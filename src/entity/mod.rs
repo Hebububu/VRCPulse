@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod bot_config;
 pub mod component_logs;
 pub mod guild_configs;
 pub mod incident_updates;

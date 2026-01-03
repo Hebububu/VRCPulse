@@ -238,6 +238,19 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Seed default polling intervals
+        let db = manager.get_connection();
+        db.execute_unprepared(
+            r#"
+            INSERT INTO bot_config (key, value, updated_at) VALUES
+                ('polling.status', '60', datetime('now')),
+                ('polling.incident', '60', datetime('now')),
+                ('polling.maintenance', '60', datetime('now')),
+                ('polling.metrics', '60', datetime('now'))
+            "#,
+        )
+        .await?;
+
         Ok(())
     }
 
