@@ -130,4 +130,14 @@ pub const CLOUDFRONT_METRICS: &[MetricDefinition] = &[
         name: "extauth_oculus",
         unit: "ms",
     },
+    MetricDefinition {
+        endpoint: "/extauth_steam_count.json",
+        name: "extauth_steam_count",
+        unit: "count",
+    },
+    MetricDefinition {
+        endpoint: "/extauth_oculus_count.json",
+        name: "extauth_oculus_count",
+        unit: "count",
+    },
 ];

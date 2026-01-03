@@ -66,8 +66,13 @@ async fn upsert_incident(
 
     match existing {
         Some(existing) => {
-            // Update if status or impact changed
-            if existing.status != incident.status || existing.impact != incident.impact {
+            // Update if status, impact, title, or updated_at changed
+            let needs_update = existing.status != incident.status
+                || existing.impact != incident.impact
+                || existing.title != incident.name
+                || existing.updated_at != incident.updated_at;
+
+            if needs_update {
                 let mut active: incidents::ActiveModel = existing.into();
                 active.title = Set(incident.name.clone());
                 active.impact = Set(incident.impact.clone());
