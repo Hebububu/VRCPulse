@@ -10,7 +10,7 @@ use config::Config;
 use error::Result;
 use sea_orm::Database;
 use serenity::all::{ActivityData, Client, EventHandler, GatewayIntents, Interaction, Ready};
-use state::AppState;
+use state::{AppState, AppStateKey};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info};
@@ -46,6 +46,7 @@ impl EventHandler for Handler {
         if let Interaction::Command(command) = interaction {
             let result = match command.data.name.as_str() {
                 "hello" => commands::hello::run(&ctx, &command).await,
+                "admin" => commands::admin::config::run(&ctx, &command).await,
                 _ => Ok(()),
             };
 
@@ -54,13 +55,6 @@ impl EventHandler for Handler {
             }
         }
     }
-}
-
-/// TypeMap key for AppState access
-struct AppStateKey;
-
-impl serenity::prelude::TypeMapKey for AppStateKey {
-    type Value = Arc<RwLock<AppState>>;
 }
 
 #[tokio::main]
@@ -78,10 +72,16 @@ async fn main() -> Result<()> {
     let database = Database::connect(&config.database_url).await?;
     info!("Database connected");
 
-    // 4. Create AppState
-    let app_state = Arc::new(RwLock::new(AppState::new(database.clone())));
+    // 4. Initialize collector config
+    let (config_tx, config_rx) = collector::config::init(&database)
+        .await
+        .expect("Failed to load collector config from database");
+    info!("Collector config loaded");
 
-    // 5. Start data collector in background
+    // 5. Create AppState
+    let app_state = Arc::new(RwLock::new(AppState::new(database.clone(), config_tx)));
+
+    // 6. Start data collector in background
     let http_client = reqwest::Client::builder()
         .user_agent(concat!(
             env!("CARGO_PKG_NAME"),
@@ -91,9 +91,9 @@ async fn main() -> Result<()> {
         .build()
         .expect("Failed to create HTTP client");
 
-    tokio::spawn(collector::start(http_client, database));
+    tokio::spawn(collector::start(http_client, database, config_rx));
 
-    // 6. Configure Discord client
+    // 7. Configure Discord client
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_PRESENCES
@@ -107,13 +107,13 @@ async fn main() -> Result<()> {
         .event_handler(handler)
         .await?;
 
-    // 7. Store AppState in TypeMap
+    // 8. Store AppState in TypeMap
     {
         let mut data = client.data.write().await;
         data.insert::<AppStateKey>(app_state);
     }
 
-    // 8. Start bot
+    // 9. Start bot
     info!("Connecting to Discord...");
     if let Err(e) = client.start().await {
         error!("Client error: {:?}", e);

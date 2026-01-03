@@ -1,5 +1,15 @@
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
+use tokio::sync::RwLock;
+
+use crate::collector::CollectorConfigTx;
+
+/// TypeMap key for AppState access
+pub struct AppStateKey;
+
+impl serenity::prelude::TypeMapKey for AppStateKey {
+    type Value = Arc<RwLock<AppState>>;
+}
 
 /// Application global state
 /// - Accessible via `TypeMap` in Serenity event handlers
@@ -7,25 +17,16 @@ use std::sync::Arc;
 pub struct AppState {
     /// Database connection
     pub database: Arc<DatabaseConnection>,
-    /// HTTP client for VRChat API calls
-    pub http_client: reqwest::Client,
+    /// Collector config sender for dynamic interval updates
+    pub collector_config: CollectorConfigTx,
 }
 
 impl AppState {
     /// Create a new AppState instance
-    pub fn new(database: DatabaseConnection) -> Self {
-        let http_client = reqwest::Client::builder()
-            .user_agent(concat!(
-                env!("CARGO_PKG_NAME"),
-                "/",
-                env!("CARGO_PKG_VERSION")
-            ))
-            .build()
-            .expect("Failed to create HTTP client");
-
+    pub fn new(database: DatabaseConnection, collector_config: CollectorConfigTx) -> Self {
         Self {
             database: Arc::new(database),
-            http_client,
+            collector_config,
         }
     }
 }

@@ -67,10 +67,6 @@ impl PollerType {
         }
     }
 
-    pub fn min_interval(&self) -> u64 {
-        MIN_INTERVAL
-    }
-
     pub fn all() -> &'static [PollerType] {
         &[
             Self::Status,

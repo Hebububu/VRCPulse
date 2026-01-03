@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod hello;
 
 use serenity::all::{Command, Context, CreateCommand};
@@ -5,7 +6,9 @@ use tracing::info;
 
 /// Returns all slash command definitions
 pub fn all() -> Vec<CreateCommand> {
-    vec![hello::register()]
+    let mut commands = vec![hello::register()];
+    commands.extend(admin::all());
+    commands
 }
 
 /// Register global slash commands
