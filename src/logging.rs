@@ -1,6 +1,6 @@
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
 
 /// Initialize logging
 /// - Log level can be set via RUST_LOG environment variable

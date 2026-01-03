@@ -15,7 +15,11 @@ impl AppState {
     /// Create a new AppState instance
     pub fn new(database: DatabaseConnection) -> Self {
         let http_client = reqwest::Client::builder()
-            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!(
+                env!("CARGO_PKG_NAME"),
+                "/",
+                env!("CARGO_PKG_VERSION")
+            ))
             .build()
             .expect("Failed to create HTTP client");
 
