@@ -1,5 +1,5 @@
 [package]
-name = "HB-vrchat-status-bot"
+name = "vrc-pulse"
 version = "0.1.0"
 edition = "2024"
 
