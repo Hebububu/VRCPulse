@@ -12,7 +12,7 @@
 **VRCPulse** is a high-performance Discord bot written in Rust.<br/>
 It monitors VRChat server status and provides real-time visualized dashboards.
 
-[Documentation](./docs/README.md) · [Report Bug](https://github.com/hebu/vrc-pulse/issues) · [Request Feature](https://github.com/hebu/vrc-pulse/issues)
+[Documentation](./docs/README.md) · [Report Bug](https://github.com/hebu/VRCPulse/issues) · [Request Feature](https://github.com/hebu/VRCPulse/issues)
 
 </div>
 
@@ -34,11 +34,13 @@ It monitors VRChat server status and provides real-time visualized dashboards.
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Rust (Latest Stable)
 - `sea-orm-cli` (`cargo install sea-orm-cli`)
 
 ### Installation & Run
-1. `git clone https://github.com/hebu/vrc-pulse.git`
+
+1. `git clone https://github.com/hebu/VRCPulse.git`
 2. Create `.env`:
    ```env
    DISCORD_TOKEN=your_token
@@ -53,18 +55,22 @@ It monitors VRChat server status and provides real-time visualized dashboards.
 **VRCPulse**는 VRChat 서버 상태를 실시간으로 모니터링하고 시각화된 데이터를 제공하는 디스코드 봇입니다.
 
 ### 주요 기능
+
 - **시각화 대시보드**: 서버 지연 시간을 그래프로 생성하여 전송합니다.
 - **자동 모니터링**: 공식 API 및 메트릭 데이터를 주기적으로 수집합니다.
 - **스마트 알림**: 서버 장애 발생 시 설정된 채널로 즉시 알림을 발송합니다.
 - **간편한 설정**: 슬래시 명령어를 통해 채널 및 알림 주기를 관리할 수 있습니다.
 
 ### 시작하기
+
 상세한 설치 및 실행 방법은 상단의 [Getting Started](#-getting-started) 섹션을 참고해 주세요.
 
 ---
 
 ## 📄 Documentation
+
 See the [Documentation Index](./docs/README.md) for technical specifications.
 
 ## 📜 License
+
 MIT License.
