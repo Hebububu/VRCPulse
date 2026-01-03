@@ -13,3 +13,9 @@ This directory contains specifications for **Discord Slash Commands** and user i
 *   **[report.md](./report.md)**: Outage reporting (`/report`)
     *   Incident type selection
     *   Submission and storage workflow
+
+## Admin Commands
+
+*   **[admin/config.md](./admin/config.md)**: Bot global configuration (`/admin config`)
+    *   Polling interval management
+    *   Dynamic collector settings

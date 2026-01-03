@@ -225,11 +225,27 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // 10. Bot Config
+        manager
+            .create_table(
+                Table::create()
+                    .table(BotConfig::Table)
+                    .if_not_exists()
+                    .col(string(BotConfig::Key).primary_key())
+                    .col(string(BotConfig::Value))
+                    .col(timestamp(BotConfig::UpdatedAt))
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Drop in reverse order due to foreign key constraints
+        manager
+            .drop_table(Table::drop().table(BotConfig::Table).to_owned())
+            .await?;
         manager
             .drop_table(Table::drop().table(SentAlerts::Table).to_owned())
             .await?;
@@ -369,4 +385,12 @@ enum SentAlerts {
     ReferenceId,
     NotifiedAt,
     CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum BotConfig {
+    Table,
+    Key,
+    Value,
+    UpdatedAt,
 }

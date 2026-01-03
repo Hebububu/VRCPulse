@@ -128,6 +128,23 @@ Tracks which alerts have been sent to which guilds to prevent duplicate notifica
 
 > **Note**: Composite unique constraint on `(guild_id, alert_type, reference_id)` prevents duplicate alerts.
 
+### 10. Bot Configuration (`bot_config`)
+Global bot configuration storage (key-value pairs).
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `key` | String | PK | Configuration key (e.g., `polling.status`) |
+| `value` | String | | Configuration value (JSON-serialized if needed) |
+| `updated_at` | DateTime | | Last modification time |
+
+**Default Keys:**
+| Key | Default Value | Description |
+| :--- | :--- | :--- |
+| `polling.status` | `60` | Status poller interval (seconds) |
+| `polling.incident` | `30` | Incident poller interval (seconds) |
+| `polling.maintenance` | `300` | Maintenance poller interval (seconds) |
+| `polling.metrics` | `60` | Metrics poller interval (seconds) |
+
 ---
 
 ## 📈 Optimization & Integrity
