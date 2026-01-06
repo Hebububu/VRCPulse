@@ -47,7 +47,7 @@ impl EventHandler for Handler {
         if let Interaction::Command(command) = interaction {
             let result = match command.data.name.as_str() {
                 "hello" => commands::hello::run(&ctx, &command).await,
-                "admin" => commands::admin::config::run(&ctx, &command).await,
+                // "admin" => commands::admin::config::run(&ctx, &command).await,
                 "status" => commands::status::run(&ctx, &command).await,
                 _ => Ok(()),
             };

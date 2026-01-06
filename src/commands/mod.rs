@@ -8,7 +8,7 @@ use tracing::info;
 /// Returns all slash command definitions
 pub fn all() -> Vec<CreateCommand> {
     let mut commands = vec![hello::register()];
-    commands.extend(admin::all());
+    // commands.extend(admin::all());
     commands.extend(status::all());
     commands
 }
