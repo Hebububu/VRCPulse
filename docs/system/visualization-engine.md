@@ -70,14 +70,20 @@ flowchart TB
 
 ### Value Transformation
 
-| Metric | Transformation |
-|--------|----------------|
-| `visits` | Raw count |
-| `api_latency` | Raw (normalized 0-1) |
-| `api_requests` | Raw (normalized 0-1) |
-| `api_errors` | Multiply by 100 (to %) |
-| `extauth_steam` | Multiply by 100 (to %) |
-| `extauth_oculus` | Multiply by 100 (to %) |
+Raw metric values from CloudFront are stored in `metric_logs` with their original units. The visualization layer transforms these values for display.
+
+| Metric | Stored Unit | Transformation | Implementation |
+|--------|-------------|----------------|----------------|
+| `visits` | count | Downsample only | `load_metric_downsampled()` |
+| `api_latency` | ms | Downsample only | `load_metric_downsampled()` |
+| `api_requests` | count | Downsample only | `load_metric_downsampled()` |
+| `api_errors` | count | Downsample + multiply by 100 | `load_metric_as_percent()` |
+| `extauth_steam` | ms | Downsample + multiply by 100 | `load_metric_as_percent()` |
+| `extauth_oculus` | ms | Downsample + multiply by 100 | `load_metric_as_percent()` |
+
+**Query functions**: `src/visualization/query.rs:113-129`
+
+> **Note**: The visualization layer treats `api_errors`, `extauth_steam`, and `extauth_oculus` as 0-1 ratio values and multiplies by 100 for percentage display. The actual format of CloudFront API responses is not validated by the collector.
 
 ---
 
@@ -103,28 +109,19 @@ flowchart TB
 
 ## Command Integration
 
-### `/status dashboard`
+### `/status`
 
 Generates the dashboard PNG and returns it as a Discord embed.
 
-**Response Embed:**
+**Implementation**: `src/commands/status/dashboard.rs:21-148`
 
-```rust
-CreateEmbed::default()
-    .title("VRChat Status Dashboard")
-    .color(Colour::new(embed_color)) // Green/Yellow/Orange/Red based on status
-    .image("attachment://dashboard.png")
-    .field("System Status", "🟢 All Systems Operational", false)
-    .field("Online Users", "113k (avg) / 135k (max)", true)
-    .field("API Error Rate", "0.0003%", true)
-    .field("\u{200B}", "\u{200B}", true)
-    .field("Steam Auth", "94.7%", true)
-    .field("Meta Auth", "94.6%", true)
-    .field("\u{200B}", "\u{200B}", true)
-    .field("Components", component_status, false) // 🟢 API / Website\n🟢 Authentication...
-    .footer(CreateEmbedFooter::new("Last 12 hours"))
-    .timestamp(Timestamp::now())
-```
+**Embed Fields:**
+- System Status (emoji + description)
+- Online Users (avg/max)
+- API Error Rate (percentage)
+- Steam Auth (percentage)
+- Meta Auth (percentage)
+- Component groups (API/Website, Realtime Networking)
 
 **Status Indicators:**
 
@@ -145,22 +142,20 @@ CreateEmbed::default()
 | `major_outage` | 🔴 |
 | `under_maintenance` | 🔵 |
 
-**Attachment:**
-```rust
-CreateAttachment::bytes(png_bytes, "dashboard.png")
-```
+See `docs/commands/status.md` for full command documentation.
 
 ---
 
-## Module Structure
+## Source Files
 
-```
-src/visualization/
-├── mod.rs           # Module exports
-├── theme.rs         # Color constants
-├── query.rs         # Data loading & downsampling
-└── dashboard.rs     # Dashboard generation
-```
+| Component | File | Lines |
+|-----------|------|-------|
+| Module exports | `src/visualization/mod.rs` | 1-11 |
+| Color constants | `src/visualization/theme.rs` | 1-34 |
+| Data queries & downsampling | `src/visualization/query.rs` | 1-130 |
+| Dashboard generation | `src/visualization/dashboard.rs` | 1-246 |
+| Command handler | `src/commands/status/dashboard.rs` | 21-148 |
+| Chart test example | `examples/chart_test.rs` | 1-359 |
 
 ---
 
@@ -178,10 +173,9 @@ src/visualization/
 
 ## Caching Strategy
 
-| Chart Type | Cache TTL | Rationale |
-|------------|-----------|-----------|
-| Dashboard | 2 minutes | Balances freshness with load |
+> **[NOT IMPLEMENTED]**: No caching is currently implemented. Dashboard is regenerated on each request.
 
-**Cache Bypass:**
-- `fresh: true` option forces regeneration
+**Planned approach:**
+- Cache TTL: 2 minutes
 - Cache key: `dashboard:{timestamp_bucket}`
+- Bypass option for forced regeneration

@@ -4,150 +4,116 @@ Admin command for managing bot configuration. Currently supports polling interva
 
 ---
 
+## Status
+
+> **[DISABLED]**: This command is implemented but currently disabled in bot registration. See `src/commands/mod.rs:11`. To enable, uncomment: `commands.extend(admin::all());`
+
+---
+
 ## Permissions
 
 - Requires **Administrator** permission in the guild
-- Bot owner can use this command in any guild (optional, for future)
 
 ---
 
 ## Subcommands
 
-### `/admin config polling`
-
-Manage data collector polling intervals.
-
-#### `/admin config polling show`
+### `/admin config show`
 
 Display current polling interval settings.
 
-**Response Embed:**
-
-```rust
-CreateEmbed::default()
-    .title("Polling Intervals")
-    .color(Colour::new(0x00b0f4))
-    .fields(vec![
-        ("Status", "60s", true),
-        ("Incident", "60s", true),
-        ("Maintenance", "60s", true),
-        ("Metrics", "60s", true),
-    ])
-    .footer(CreateEmbedFooter::new("Use /admin config polling set to change"))
+**Response:**
+```
+[Title] Polling Intervals
+[Color] Blue (0x00b0f4)
+[Fields]
+  Status: 60s (inline)
+  Incident: 60s (inline)
+  Maintenance: 60s (inline)
+  Metrics: 60s (inline)
+[Footer] Use /admin config set to change
 ```
 
-#### `/admin config polling set <poller> <seconds>`
+### `/admin config set <poller> <seconds>`
 
 Update a specific poller's interval.
 
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `poller` | String (Choice) | Yes | `status`, `incident`, `maintenance`, `metrics` |
-| `seconds` | Integer | Yes | Interval in seconds (min: 60, max: 3600) |
+| `poller` | Choice | Yes | `status`, `incident`, `maintenance`, `metrics` |
+| `seconds` | Integer | Yes | Interval in seconds (60-3600) |
 
 **Validation:**
-- All pollers: minimum 60 seconds
-- All pollers: maximum 3600 seconds (1 hour)
+- Minimum: 60 seconds
+- Maximum: 3600 seconds (1 hour)
 
-**Response Embed (Success):**
-
-```rust
-CreateEmbed::default()
-    .title("Configuration Updated")
-    .description("Polling interval has been changed.")
-    .color(Colour::new(0x57f287)) // Green
-    .fields(vec![
-        ("Poller", "incident", true),
-        ("New Interval", "20s", true),
-    ])
-    .timestamp(Timestamp::now())
+**Success Response:**
+```
+[Title] Configuration Updated
+[Description] Polling interval has been changed.
+[Color] Green (0x57f287)
+[Fields]
+  Poller: {name} (inline)
+  New Interval: {seconds}s (inline)
 ```
 
-**Response Embed (Error):**
-
-```rust
-CreateEmbed::default()
-    .title("Invalid Interval")
-    .description("Interval must be between 60 and 3600 seconds for `incident` poller.")
-    .color(Colour::new(0xed4245)) // Red
+**Error Response:**
+```
+[Title] Invalid Interval
+[Description] Interval must be between 60 and 3600 seconds.
+[Color] Red (0xed4245)
 ```
 
-#### `/admin config polling reset`
+### `/admin config reset`
 
 Reset all polling intervals to default values (60 seconds).
 
-**Response Embed:**
-
-```rust
-CreateEmbed::default()
-    .title("Configuration Reset")
-    .description("All polling intervals have been reset to default values.")
-    .color(Colour::new(0x57f287)) // Green
-    .fields(vec![
-        ("Status", "60s", true),
-        ("Incident", "60s", true),
-        ("Maintenance", "60s", true),
-        ("Metrics", "60s", true),
-    ])
-    .timestamp(Timestamp::now())
+**Response:**
+```
+[Title] Configuration Reset
+[Description] All polling intervals have been reset to default values.
+[Color] Green (0x57f287)
+[Fields]
+  Status: 60s (inline)
+  Incident: 60s (inline)
+  Maintenance: 60s (inline)
+  Metrics: 60s (inline)
 ```
 
 ---
 
-## Database Schema
+## Implementation
 
-### `bot_config` Table
+### Source Files
 
-Global bot configuration storage (key-value).
+| Component | File | Lines |
+|-----------|------|-------|
+| Command definition | `src/commands/admin/config.rs` | 12-62 |
+| Handler | `src/commands/admin/config.rs` | 65-101 |
+| Show handler | `src/commands/admin/config.rs` | 103-140 |
+| Set handler | `src/commands/admin/config.rs` | 142-190 |
+| Reset handler | `src/commands/admin/config.rs` | 192-220 |
+| Config module | `src/collector/config.rs` | 1-271 |
 
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `key` | String | PK | Configuration key |
-| `value` | String | | JSON-serialized value |
-| `updated_at` | DateTime | | Last modification time |
+### Database
 
-**Polling Interval Keys:**
-- `polling.status` → `"60"`
-- `polling.incident` → `"60"`
-- `polling.maintenance` → `"60"`
-- `polling.metrics` → `"60"`
+| Table | Purpose |
+|-------|---------|
+| `bot_config` | Store polling intervals as key-value pairs |
 
----
+**Keys:**
+- `polling.status` - Status poller interval
+- `polling.incident` - Incident poller interval
+- `polling.maintenance` - Maintenance poller interval
+- `polling.metrics` - Metrics poller interval
 
-## Implementation Notes
+### Dynamic Updates
 
-### Dynamic Interval Updates
+Uses `tokio::sync::watch` channels for live interval updates without restart.
 
-The collector should check the database for interval changes:
-
-1. **Option A: Reload on next tick**
-   - Each poll loop reads current interval from DB before sleeping
-   - Simple but adds DB query per tick
-
-2. **Option B: Watch channel** (Recommended)
-   - Use `tokio::sync::watch` channel
-   - Command updates DB and sends new value to channel
-   - Collector receives update and adjusts interval immediately
-
-```rust
-// Pseudocode for Option B
-pub struct CollectorConfig {
-    pub status_interval: watch::Receiver<Duration>,
-    pub incident_interval: watch::Receiver<Duration>,
-    // ...
-}
-
-// In command handler
-config_tx.send(new_interval)?;
-db.update_config("polling.status", new_interval).await?;
-```
-
-### Startup Behavior
-
-On bot startup:
-1. Load intervals from `bot_config` table
-2. If key not found, return error (migration seeds default values)
-3. Initialize watch channels with loaded values
+- **Config init**: `src/collector/config.rs:162-199`
+- **Watch channel**: `src/collector/config.rs:91-97`
+- **Poll loop**: `src/collector/mod.rs:39-73`
 
 ---
 
@@ -155,7 +121,13 @@ On bot startup:
 
 | Error | Response |
 | :--- | :--- |
-| Invalid interval range | "❌ Interval must be between 60 and 3600 seconds" |
-| Database error | "❌ Failed to save configuration" |
-| Missing config key | Startup error (run migration to seed defaults) |
-| Missing permission | "❌ You need Administrator permission to use this command" |
+| Invalid interval range | "Interval must be between 60 and 3600 seconds" |
+| Database error | "Failed to save configuration" |
+| Missing permission | Discord handles (command not shown to non-admins) |
+
+---
+
+## Related Documents
+
+- `docs/system/data-collector.md` - How polling intervals affect data collection
+- `docs/system/database-schema.md` - `bot_config` table schema

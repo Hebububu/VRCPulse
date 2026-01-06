@@ -8,7 +8,25 @@ We use **SQLite** as the primary data store and **Sea-ORM** as the Object-Relati
 
 ---
 
-## 🛠 Tables
+## Source Files
+
+| Component | File | Lines |
+|-----------|------|-------|
+| Migration (all tables) | `migration/src/m20260103_001_create_table.rs` | 1-410 |
+| Guild configs entity | `src/entity/guild_configs.rs` | 1-39 |
+| User reports entity | `src/entity/user_reports.rs` | 1-38 |
+| Status logs entity | `src/entity/status_logs.rs` | 1-22 |
+| Component logs entity | `src/entity/component_logs.rs` | 1-21 |
+| Incidents entity | `src/entity/incidents.rs` | 1-32 |
+| Incident updates entity | `src/entity/incident_updates.rs` | 1-38 |
+| Maintenances entity | `src/entity/maintenances.rs` | 1-22 |
+| Metric logs entity | `src/entity/metric_logs.rs` | 1-25 |
+| Sent alerts entity | `src/entity/sent_alerts.rs` | 1-39 |
+| Bot config entity | `src/entity/bot_config.rs` | 1-18 |
+
+---
+
+## Tables
 
 ### 1. Guild Configuration (`guild_configs`)
 Stores Discord server (guild) specific settings.
@@ -105,7 +123,7 @@ Stores time-series data from CloudFront Metrics.
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | Integer | PK, AutoInc | |
-| `metric_name` | String | | `apilatency`, `visits`, `apierrors`, etc. |
+| `metric_name` | String | | `api_latency`, `visits`, `api_errors`, etc. |
 | `value` | Double | | Measured value |
 | `unit` | String | | `ms`, `count`, `percent`, etc. |
 | `interval_sec` | Integer | | Data resolution (e.g., 60 for 1-minute data) |
@@ -141,13 +159,15 @@ Global bot configuration storage (key-value pairs).
 | Key | Default Value | Description |
 | :--- | :--- | :--- |
 | `polling.status` | `60` | Status poller interval (seconds) |
-| `polling.incident` | `30` | Incident poller interval (seconds) |
-| `polling.maintenance` | `300` | Maintenance poller interval (seconds) |
+| `polling.incident` | `60` | Incident poller interval (seconds) |
+| `polling.maintenance` | `60` | Maintenance poller interval (seconds) |
 | `polling.metrics` | `60` | Metrics poller interval (seconds) |
+
+**Source**: `migration/src/m20260103_001_create_table.rs:246-249`
 
 ---
 
-## 📈 Optimization & Integrity
+## Optimization & Integrity
 
 ### Unique Constraints
 - **`status_logs.source_timestamp`**: Prevents duplicate snapshots.
@@ -182,7 +202,7 @@ ON sent_alerts(guild_id, alert_type, reference_id);
 
 ---
 
-## 🗑 Data Retention Policy
+## Data Retention Policy
 
 Time-series data can grow indefinitely. The following retention policies are recommended:
 

@@ -7,9 +7,9 @@ Here you can find detailed technical specifications, architecture designs, and p
 
 ### [🎮 Commands (User Interface)](./commands/README.md)
 Specifications for Discord Slash Commands and user interactions.
-- [**Config Command**](./commands/config.md) - Channel and reporting interval settings.
+- [**Config Command**](./commands/config.md) `[NOT IMPLEMENTED]` - Channel and reporting interval settings.
 - [**Status Command**](./commands/status.md) - Immediate status checks and graph output.
-- [**Report Command**](./commands/report.md) - User-driven incident reporting.
+- [**Report Command**](./commands/report.md) `[NOT IMPLEMENTED]` - User-driven incident reporting.
 
 ### [⚙️ System Design (Architecture & Data)](./system/README.md)
 Backend logic, database schema, and core engine designs.
@@ -19,6 +19,6 @@ Backend logic, database schema, and core engine designs.
 
 ### [🚨 Alert Policies](./alerts/README.md)
 Business logic for incident detection and alert broadcasting.
-- [**User Threshold Policy**](./alerts/policy-user-threshold.md) - Accumulation-based alerting conditions.
-- [**VRChat Status Policy**](./alerts/policy-vrchat-status.md) - Handling official status API events.
-- [**CloudFront Policy**](./alerts/policy-cloudfront.md) - Anomaly detection in CloudFront metrics.
+- [**User Threshold Policy**](./alerts/policy-user-threshold.md) `[NOT IMPLEMENTED]` - Accumulation-based alerting conditions.
+- [**VRChat Status Policy**](./alerts/policy-vrchat-status.md) `[NOT IMPLEMENTED]` - Handling official status API events.
+- [**CloudFront Policy**](./alerts/policy-cloudfront.md) `[NOT IMPLEMENTED]` - Anomaly detection in CloudFront metrics.
