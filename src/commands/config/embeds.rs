@@ -183,3 +183,49 @@ pub fn unregister_error() -> CreateEmbed {
         .description("Failed to unregister. Please try again.")
         .color(Colour::new(colors::ERROR))
 }
+
+// =============================================================================
+// Language Handler Embeds
+// =============================================================================
+
+/// Get display name for language code
+fn get_language_display_name(code: Option<&str>) -> &str {
+    match code {
+        Some("en") => "English",
+        Some("ko") => "한국어 (Korean)",
+        None => "Auto-detect (Discord)",
+        Some(other) => other,
+    }
+}
+
+/// Build embed showing current language setting
+pub fn language_current(current: Option<&str>, is_guild: bool) -> CreateEmbed {
+    let display_name = get_language_display_name(current);
+    let context = if is_guild { "server" } else { "account" };
+
+    CreateEmbed::default()
+        .title("Language Settings")
+        .description(format!(
+            "Current language for this {}: **{}**",
+            context, display_name
+        ))
+        .color(Colour::new(colors::BRAND))
+        .field(
+            "Available Languages",
+            "- `en` - English\n- `ko` - 한국어 (Korean)\n- `auto` - Auto-detect (Discord)",
+            false,
+        )
+        .footer(CreateEmbedFooter::new(
+            "Use /config language <code> to change",
+        ))
+}
+
+/// Build embed confirming language update
+pub fn language_updated(language: Option<&str>) -> CreateEmbed {
+    let display_name = get_language_display_name(language);
+
+    CreateEmbed::default()
+        .title("Language Updated")
+        .description(format!("Language has been set to **{}**.", display_name))
+        .color(Colour::new(colors::SUCCESS))
+}

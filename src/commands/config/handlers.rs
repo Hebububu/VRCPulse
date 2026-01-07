@@ -412,3 +412,116 @@ pub async fn handle_unregister_cancel(
         )
         .await
 }
+
+// =============================================================================
+// Language Handler
+// =============================================================================
+
+/// Handle /config language
+pub async fn handle_language(
+    ctx: &Context,
+    interaction: &CommandInteraction,
+    config_context: ConfigContext,
+    language_code: Option<String>,
+) -> Result<(), serenity::Error> {
+    let db = database::get_db(ctx).await;
+
+    // Check if user provided any argument
+    let has_argument = language_code.is_some();
+
+    // Convert "auto" to None (NULL in database means auto-detect)
+    let language = language_code.and_then(|code| if code == "auto" { None } else { Some(code) });
+
+    match config_context {
+        ConfigContext::Guild(guild_id) => {
+            let repo = GuildConfigRepository::new(db.clone());
+
+            // Check if registered
+            let existing = repo.get(guild_id).await;
+            if existing.is_none() {
+                return respond_error(
+                    ctx,
+                    interaction,
+                    "This server isn't registered yet.\nRun `/config setup #channel` first.",
+                )
+                .await;
+            }
+
+            // If no language specified, show current setting
+            if !has_argument {
+                let current = existing.and_then(|c| c.language);
+                let embed = embeds::language_current(current.as_deref(), true);
+                let response = CreateInteractionResponseMessage::new().embed(embed);
+                return interaction
+                    .create_response(&ctx.http, CreateInteractionResponse::Message(response))
+                    .await;
+            }
+
+            // Update language
+            match repo.update_language(guild_id, language.clone()).await {
+                Ok(_) => {
+                    info!(guild_id = %guild_id, language = ?language, "Updated guild language");
+                    let embed = embeds::language_updated(language.as_deref());
+                    let response = CreateInteractionResponseMessage::new().embed(embed);
+                    interaction
+                        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
+                        .await
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to update guild language");
+                    respond_error(
+                        ctx,
+                        interaction,
+                        "Failed to update language. Please try again.",
+                    )
+                    .await
+                }
+            }
+        }
+        ConfigContext::User(user_id) => {
+            let repo = UserConfigRepository::new(db.clone());
+
+            // Check if registered
+            let existing = repo.get(user_id).await;
+            if existing.is_none() {
+                return respond_error(
+                    ctx,
+                    interaction,
+                    "You aren't registered yet.\nRun `/config setup` first.",
+                )
+                .await;
+            }
+
+            // If no language specified, show current setting
+            if !has_argument {
+                let current = existing.and_then(|c| c.language);
+                let embed = embeds::language_current(current.as_deref(), false);
+                let response = CreateInteractionResponseMessage::new().embed(embed);
+                return interaction
+                    .create_response(&ctx.http, CreateInteractionResponse::Message(response))
+                    .await;
+            }
+
+            // Update language
+            match repo.update_language(user_id, language.clone()).await {
+                Ok(_) => {
+                    info!(user_id = %user_id, language = ?language, "Updated user language");
+                    let embed = embeds::language_updated(language.as_deref());
+                    let response = CreateInteractionResponseMessage::new().embed(embed);
+                    interaction
+                        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
+                        .await
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to update user language");
+                    respond_error(
+                        ctx,
+                        interaction,
+                        "Failed to update language. Please try again.",
+                    )
+                    .await
+                }
+            }
+        }
+    }
+}

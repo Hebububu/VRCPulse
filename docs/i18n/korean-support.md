@@ -123,7 +123,7 @@ assets/
 
 **Goal**: Add language preference storage and configuration command
 
-**Status**: [o] In progress
+**Status**: [x] Complete
 
 **Tasks**:
 - [x] Create migration `m20260108_001_add_language_column.rs`
@@ -131,8 +131,8 @@ assets/
 - [x] Add `language` column to `user_configs` table
 - [x] Update entities manually (language field added)
 - [x] Add `update_language()` methods to repositories
-- [ ] Implement `/config language` subcommand
-- [ ] Add language embed builders
+- [x] Implement `/config language` subcommand
+- [x] Add language embed builders
 
 **Files to Create/Modify**:
 | File | Action |

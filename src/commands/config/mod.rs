@@ -13,7 +13,7 @@ use serenity::all::{
 use crate::commands::shared::respond_error;
 use context::determine_context;
 use handlers::{
-    handle_setup, handle_show, handle_unregister, handle_unregister_cancel,
+    handle_language, handle_setup, handle_show, handle_unregister, handle_unregister_cancel,
     handle_unregister_confirm, is_cancel_button, is_confirm_button,
 };
 
@@ -52,6 +52,24 @@ pub fn register() -> CreateCommand {
             "unregister",
             "Disable VRCPulse alerts",
         ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "language",
+                "Set preferred language for alerts",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "code",
+                    "Language code (leave empty to use Discord's language)",
+                )
+                .required(false)
+                .add_string_choice("English", "en")
+                .add_string_choice("한국어 (Korean)", "ko")
+                .add_string_choice("Auto-detect (Discord)", "auto"),
+            ),
+        )
 }
 
 // =============================================================================
@@ -87,6 +105,21 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         }
         "show" => handle_show(ctx, interaction, config_context).await,
         "unregister" => handle_unregister(ctx, interaction, config_context).await,
+        "language" => {
+            let language_code = if let ResolvedValue::SubCommand(opts) = &subcommand.value {
+                opts.iter().find_map(|opt| {
+                    if opt.name == "code"
+                        && let ResolvedValue::String(code) = opt.value
+                    {
+                        return Some(code.to_string());
+                    }
+                    None
+                })
+            } else {
+                None
+            };
+            handle_language(ctx, interaction, config_context, language_code).await
+        }
         _ => respond_error(ctx, interaction, "Unknown subcommand").await,
     }
 }
