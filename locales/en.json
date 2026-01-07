@@ -1,0 +1,246 @@
+{
+  "commands": {
+    "status": {
+      "name": "status",
+      "description": "View VRChat status dashboard with metrics visualization"
+    },
+    "config": {
+      "name": "config",
+      "description": "Configure VRCPulse settings",
+      "setup": {
+        "name": "setup",
+        "description": "Register for VRCPulse alerts",
+        "option_channel": "Channel to receive alerts"
+      },
+      "show": {
+        "name": "show",
+        "description": "View current configuration"
+      },
+      "unregister": {
+        "name": "unregister",
+        "description": "Disable VRCPulse alerts"
+      },
+      "language": {
+        "name": "language",
+        "description": "Set preferred language for alerts",
+        "option_code": "Language code"
+      }
+    },
+    "report": {
+      "name": "report",
+      "description": "Report a VRChat issue",
+      "option_type": "Type of issue you're experiencing",
+      "option_details": "Additional details about the issue (max 500 chars)"
+    },
+    "hello": {
+      "name": "hello",
+      "description": "Say hello to VRCPulse!"
+    }
+  },
+
+  "embeds": {
+    "dashboard": {
+      "title": "VRChat Status Dashboard",
+      "system_status": "System Status",
+      "online_users": "Online Users",
+      "api_error_rate": "API Error Rate",
+      "steam_auth": "Steam Auth",
+      "meta_auth": "Meta Auth",
+      "footer_timeframe": "Last 12 hours",
+      "components": "Components",
+      "no_data": "No data available",
+      "group_api_website": "API / Website",
+      "group_realtime_networking": "Realtime Networking",
+      "error_title": "Error",
+      "error_description": "Failed to generate dashboard. Please try again later."
+    },
+
+    "config": {
+      "show": {
+        "guild_active": {
+          "title": "VRCPulse Configuration",
+          "field_status": "Status",
+          "field_status_value": "Active",
+          "field_channel": "Channel",
+          "field_channel_not_set": "Not set",
+          "field_registered": "Registered",
+          "footer": "Use /config unregister to disable alerts"
+        },
+        "guild_disabled": {
+          "title": "VRCPulse - Unregistered",
+          "description": "This server was unregistered %{time}.\nRun `/config setup #channel` to re-enable alerts.",
+          "field_previous_channel": "Previous Channel",
+          "field_originally_registered": "Originally Registered"
+        },
+        "guild_intro": {
+          "title": "Welcome to VRCPulse!",
+          "description": "VRCPulse monitors VRChat server status and alerts you when issues occur.",
+          "field_getting_started": "Getting Started",
+          "field_getting_started_value": "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",
+          "field_commands": "Commands",
+          "field_commands_value": "- `/config setup <channel>` - Register and set alert channel\n- `/config show` - View current settings\n- `/config unregister` - Disable alerts",
+          "footer": "This server isn't registered yet. Run /config setup #channel to get started!"
+        },
+        "user_active": {
+          "title": "VRCPulse Configuration",
+          "field_status": "Status",
+          "field_status_value": "Active",
+          "field_delivery": "Delivery",
+          "field_delivery_value": "Direct Messages",
+          "field_registered": "Registered",
+          "footer": "Use /config unregister to disable alerts"
+        },
+        "user_disabled": {
+          "title": "VRCPulse - Unregistered",
+          "description": "You unregistered %{time}.\nRun `/config setup` to re-enable DM alerts.",
+          "field_originally_registered": "Originally Registered"
+        },
+        "user_intro": {
+          "title": "Welcome to VRCPulse!",
+          "description": "VRCPulse monitors VRChat server status and alerts you when issues occur.",
+          "field_getting_started": "Getting Started",
+          "field_getting_started_value": "1. Run `/config setup` to register for DM alerts\n2. Check current VRChat status with `/status`",
+          "field_commands": "Commands",
+          "field_commands_value": "- `/config setup` - Register for DM alerts\n- `/config show` - View current settings\n- `/config unregister` - Disable alerts",
+          "footer": "You aren't registered yet. Run /config setup to get started!"
+        }
+      },
+      "unregister": {
+        "confirm": {
+          "title": "Confirm Unregister",
+          "description_guild": "Are you sure you want to unregister **%{name}**?\n\nThis will stop all VRCPulse alerts for this server.",
+          "description_user": "Are you sure you want to unregister?\n\nThis will stop all VRCPulse DM alerts.",
+          "footer": "This confirmation expires in 15 minutes"
+        },
+        "success": {
+          "title": "Unregistered",
+          "description": "VRCPulse alerts have been disabled.\n\nYou can re-register anytime with `/config setup`."
+        },
+        "cancelled": {
+          "title": "Cancelled",
+          "description": "Unregister cancelled. Your configuration remains active."
+        },
+        "error": {
+          "title": "Error",
+          "description": "Failed to unregister. Please try again."
+        }
+      },
+      "language": {
+        "current": {
+          "title": "Language Settings",
+          "description": "Current language: **%{language}**"
+        },
+        "updated": {
+          "title": "Language Updated",
+          "description": "Language has been changed to **%{language}**."
+        }
+      }
+    },
+
+    "report": {
+      "success": {
+        "title": "Report Submitted",
+        "description": "Thank you for reporting **%{incident_type}**.\n\n%{others_text}",
+        "footer": "Your report helps us detect widespread issues.",
+        "others_none": "You're the first to report this issue recently.",
+        "others_one": "1 other user reported this issue in the last %{interval} minutes.",
+        "others_many": "%{count} others reported this issue in the last %{interval} minutes."
+      },
+      "cooldown": {
+        "title": "Report Cooldown",
+        "description": "You recently submitted a report.\nYou can report again %{time}."
+      },
+      "intro": {
+        "title": "Welcome to VRCPulse!",
+        "description": "VRCPulse monitors VRChat server status and alerts you when issues occur.",
+        "field_getting_started": "Getting Started",
+        "field_getting_started_value": "1. Run `/config setup` to register for DM alerts\n2. Check current VRChat status with `/status`",
+        "field_commands": "Commands",
+        "field_commands_value": "- `/config setup` - Register for DM alerts\n- `/config show` - View current settings\n- `/status` - View VRChat status dashboard",
+        "footer": "Run /config setup to start receiving alerts and submit reports!"
+      },
+      "error_guild_not_registered": "An administrator must run `/config setup #channel` first.",
+      "error_insert_failed": "Failed to submit report. Please try again."
+    },
+
+    "intro": {
+      "guild_join": {
+        "title": "Welcome to VRCPulse!",
+        "description": "VRCPulse monitors VRChat server status and alerts you when issues occur.",
+        "field_getting_started": "Getting Started",
+        "field_getting_started_value": "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",
+        "field_commands": "Commands",
+        "field_commands_value": "- `/config setup <channel>` - Register and set alert channel\n- `/config show` - View current settings\n- `/status` - View VRChat status dashboard",
+        "footer": "Thank you for adding VRCPulse to your server!"
+      }
+    },
+
+    "alerts": {
+      "threshold": {
+        "title": "High Report Volume Detected",
+        "description": "**%{count}** users reported **%{incident_type}** in the last %{interval} minutes.",
+        "field_recent_reports": "Recent Reports",
+        "no_recent_reports": "No recent reports",
+        "footer": "Check /status for official VRChat status"
+      }
+    },
+
+    "hello": {
+      "message": "Hello, %{user}! 👋"
+    }
+  },
+
+  "buttons": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "yes_unregister": "Yes, Unregister"
+  },
+
+  "errors": {
+    "unknown_command": "Unknown command",
+    "missing_incident_type": "Missing incident type",
+    "details_too_long": "Details must be under %{max} characters.\nYou provided %{current} characters.",
+    "generic": "An error occurred. Please try again."
+  },
+
+  "charts": {
+    "online_users": "Online Users",
+    "api_latency": "API Latency",
+    "api_requests": "API Requests",
+    "api_error_rate": "API Error Rate",
+    "steam_auth_rate": "Steam Auth Success Rate",
+    "meta_auth_rate": "Meta Auth Success Rate"
+  },
+
+  "time": {
+    "just_now": "Just now",
+    "min_ago_one": "1 min ago",
+    "min_ago_many": "%{n} min ago"
+  },
+
+  "incident_types": {
+    "login": "Login Issues",
+    "instance": "Instance/World Loading",
+    "api": "API/Website Issues",
+    "auth": "Authentication Issues",
+    "download": "Content Download Issues",
+    "other": "Other Issues"
+  },
+
+  "status": {
+    "unknown": "Unknown"
+  },
+
+  "components": {
+    "API / Website": "API / Website",
+    "Realtime Networking": "Realtime Networking",
+    "Authentication / Login": "Authentication / Login",
+    "Social / Friends List": "Social / Friends List",
+    "SDK Asset Uploads": "SDK Asset Uploads",
+    "Realtime Player State Changes": "Realtime Player State Changes",
+    "USA, West (San José)": "USA, West (San José)",
+    "USA, East (Washington D.C.)": "USA, East (Washington D.C.)",
+    "Europe (Amsterdam)": "Europe (Amsterdam)",
+    "Japan (Tokyo)": "Japan (Tokyo)"
+  }
+}

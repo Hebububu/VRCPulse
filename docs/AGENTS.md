@@ -30,6 +30,8 @@ docs/
 │   ├── policy-user-threshold.md   # [NOT IMPLEMENTED]
 │   ├── policy-vrchat-status.md    # [NOT IMPLEMENTED]
 │   └── policy-cloudfront.md       # [NOT IMPLEMENTED]
+├── i18n/                     # Internationalization
+│   └── korean-support.md     # Korean language implementation plan
 └── README.md                 # Docs index for users
 ```
 
@@ -44,11 +46,13 @@ Each documentation area has its own AGENTS.md with detailed conventions:
 | **Commands** | `docs/commands/AGENTS.md` | Discord slash command specifications |
 | **System** | `docs/system/AGENTS.md` | Architecture, services, database design |
 | **Alerts** | `docs/alerts/AGENTS.md` | Alert policies, thresholds, notifications |
+| **i18n** | `docs/i18n/korean-support.md` | Internationalization implementation |
 
 **When to consult**:
 - Before writing command docs -> Read `docs/commands/AGENTS.md`
 - Before writing system docs -> Read `docs/system/AGENTS.md`
 - Before writing alert docs -> Read `docs/alerts/AGENTS.md`
+- Before implementing i18n -> Read `docs/i18n/korean-support.md`
 
 ---
 
