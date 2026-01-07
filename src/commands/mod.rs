@@ -1,5 +1,7 @@
 pub mod admin;
+pub mod config;
 pub mod hello;
+pub mod report;
 pub mod status;
 
 use serenity::all::{Command, Context, CreateCommand};
@@ -7,7 +9,7 @@ use tracing::info;
 
 /// Returns all slash command definitions
 pub fn all() -> Vec<CreateCommand> {
-    let mut commands = vec![hello::register()];
+    let mut commands = vec![hello::register(), config::register(), report::register()];
     // commands.extend(admin::all());
     commands.extend(status::all());
     commands

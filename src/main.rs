@@ -1,3 +1,4 @@
+mod alerts;
 mod collector;
 mod commands;
 mod config;
@@ -7,11 +8,17 @@ mod logging;
 mod state;
 mod visualization;
 
+use chrono::Utc;
 use config::Config;
 use error::Result;
-use sea_orm::Database;
-use serenity::all::{ActivityData, Client, EventHandler, GatewayIntents, Interaction, Ready};
+use sea_orm::{ActiveModelTrait, ConnectOptions, ConnectionTrait, Database, Set};
+use serenity::all::{
+    ActivityData, Client, Colour, CommandInteraction, CreateEmbed, CreateEmbedFooter,
+    CreateMessage, EventHandler, GatewayIntents, Guild, Interaction, Ready,
+};
 use state::{AppState, AppStateKey};
+
+use crate::entity::command_logs;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info};
@@ -42,21 +49,143 @@ impl EventHandler for Handler {
         }
     }
 
-    /// Handle interactions (slash commands)
+    /// Handle interactions (slash commands and buttons)
     async fn interaction_create(&self, ctx: serenity::all::Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            let result = match command.data.name.as_str() {
-                "hello" => commands::hello::run(&ctx, &command).await,
-                // "admin" => commands::admin::config::run(&ctx, &command).await,
-                "status" => commands::status::run(&ctx, &command).await,
-                _ => Ok(()),
-            };
+        match interaction {
+            Interaction::Command(command) => {
+                // Log command request
+                log_command(&ctx, &command).await;
 
-            if let Err(e) = result {
-                error!("Command error: {:?}", e);
+                let result = match command.data.name.as_str() {
+                    "hello" => commands::hello::run(&ctx, &command).await,
+                    // "admin" => commands::admin::config::run(&ctx, &command).await,
+                    "config" => commands::config::run(&ctx, &command).await,
+                    "report" => commands::report::run(&ctx, &command).await,
+                    "status" => commands::status::run(&ctx, &command).await,
+                    _ => Ok(()),
+                };
+
+                if let Err(e) = result {
+                    error!("Command error: {:?}", e);
+                }
             }
+            Interaction::Component(component) => {
+                // Handle button interactions for /config unregister
+                if component.data.custom_id.starts_with("config_") {
+                    if let Err(e) = commands::config::handle_button(&ctx, &component).await {
+                        error!("Button interaction error: {:?}", e);
+                    }
+                }
+            }
+            _ => {}
         }
     }
+
+    /// Called when bot joins a new guild
+    async fn guild_create(&self, ctx: serenity::all::Context, guild: Guild, is_new: Option<bool>) {
+        // Only send intro for newly joined guilds (not on reconnect)
+        let is_new = is_new.unwrap_or(false);
+        if !is_new {
+            return;
+        }
+
+        info!(guild_id = %guild.id, guild_name = %guild.name, "Joined new guild");
+
+        // Try to send intro message to system channel
+        if let Some(system_channel_id) = guild.system_channel_id {
+            let embed = create_intro_embed();
+            let message = CreateMessage::new().embed(embed);
+
+            if let Err(e) = system_channel_id.send_message(&ctx.http, message).await {
+                error!(
+                    guild_id = %guild.id,
+                    error = %e,
+                    "Failed to send intro message to system channel"
+                );
+            } else {
+                info!(guild_id = %guild.id, "Sent intro message to system channel");
+            }
+        } else {
+            // No system channel - users will discover the bot via /config show
+            info!(
+                guild_id = %guild.id,
+                "No system channel configured, skipping intro message"
+            );
+        }
+    }
+}
+
+/// Log command execution to console and database
+async fn log_command(ctx: &serenity::all::Context, command: &CommandInteraction) {
+    let command_name = &command.data.name;
+    let user_id = command.user.id;
+    let guild_id = command.guild_id;
+    let channel_id = command.channel_id;
+
+    // Extract subcommand if present
+    let subcommand = command.data.options.first().and_then(|opt| {
+        use serenity::all::CommandDataOptionValue;
+        match &opt.value {
+            CommandDataOptionValue::SubCommand(_) | CommandDataOptionValue::SubCommandGroup(_) => {
+                Some(opt.name.as_str())
+            }
+            _ => None,
+        }
+    });
+
+    // Console log
+    info!(
+        command = command_name,
+        subcommand = subcommand,
+        user_id = %user_id,
+        guild_id = ?guild_id.map(|g| g.to_string()),
+        channel_id = %channel_id,
+        "Command received"
+    );
+
+    // Database audit log
+    let data = ctx.data.read().await;
+    if let Some(state) = data.get::<AppStateKey>() {
+        let state = state.read().await;
+        let db = state.database.as_ref();
+
+        let log = command_logs::ActiveModel {
+            command_name: Set(command_name.clone()),
+            subcommand: Set(subcommand.map(|s| s.to_string())),
+            user_id: Set(user_id.to_string()),
+            guild_id: Set(guild_id.map(|g| g.to_string())),
+            channel_id: Set(Some(channel_id.to_string())),
+            executed_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        if let Err(e) = log.insert(db).await {
+            error!(error = %e, "Failed to insert command log");
+        }
+    }
+}
+
+/// Create the introduction embed for new guilds
+fn create_intro_embed() -> CreateEmbed {
+    CreateEmbed::default()
+        .title("Welcome to VRCPulse!")
+        .description(
+            "VRCPulse monitors VRChat server status and alerts you when issues occur.",
+        )
+        .color(Colour::new(0x00b0f4))
+        .field(
+            "Getting Started",
+            "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",
+            false,
+        )
+        .field(
+            "Commands",
+            "- `/config setup <channel>` - Register and set alert channel\n- `/config show` - View current settings\n- `/status` - View VRChat status dashboard",
+            false,
+        )
+        .footer(CreateEmbedFooter::new(
+            "Thank you for adding VRCPulse to your server!",
+        ))
 }
 
 #[tokio::main]
@@ -70,9 +199,23 @@ async fn main() -> Result<()> {
 
     info!("Starting VRCPulse...");
 
-    // 3. Connect to database
-    let database = Database::connect(&config.database_url).await?;
-    info!("Database connected");
+    // 3. Connect to database with optimized settings for SQLite
+    let mut db_opts = ConnectOptions::new(&config.database_url);
+    db_opts
+        .max_connections(5)
+        .min_connections(1)
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .sqlx_logging(false); // Reduce noise, enable if debugging
+
+    let database = Database::connect(db_opts).await?;
+
+    // Enable WAL mode for better concurrency
+    database
+        .execute_unprepared("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
+        .await
+        .expect("Failed to set SQLite pragmas");
+
+    info!("Database connected (WAL mode enabled)");
 
     // 4. Initialize collector config
     let (config_tx, config_rx) = collector::config::init(&database)

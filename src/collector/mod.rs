@@ -19,6 +19,13 @@ pub use config::{CollectorConfigRx, CollectorConfigTx};
 /// Start the data collector with all pollers running concurrently
 pub async fn start(client: Client, db: DatabaseConnection, config: CollectorConfigRx) {
     info!("Starting data collector...");
+    info!(
+        status = config.status.borrow().as_secs(),
+        incident = config.incident.borrow().as_secs(),
+        maintenance = config.maintenance.borrow().as_secs(),
+        metrics = config.metrics.borrow().as_secs(),
+        "Polling intervals (seconds)"
+    );
 
     tokio::join!(
         poll_loop_dynamic("status", config.status.clone(), || {
@@ -52,7 +59,7 @@ async fn poll_loop_dynamic<F, Fut>(
             _ = ticker.tick() => {
                 match poll_fn().await {
                     Ok(()) => {
-                        debug!(poller = name, "Poll completed successfully");
+                        info!(poller = name, "Polled");
                     }
                     Err(e) => {
                         error!(poller = name, error = %e, "Poll failed");

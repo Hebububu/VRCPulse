@@ -4,14 +4,16 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "guild_configs")]
+#[sea_orm(table_name = "command_logs")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub guild_id: String,
+    #[sea_orm(primary_key)]
+    pub id: i64,
+    pub command_name: String,
+    pub subcommand: Option<String>,
+    pub user_id: String,
+    pub guild_id: Option<String>,
     pub channel_id: Option<String>,
-    pub enabled: bool,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub executed_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

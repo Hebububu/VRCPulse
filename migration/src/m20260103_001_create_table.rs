@@ -14,8 +14,6 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(string(GuildConfigs::GuildId).primary_key())
                     .col(string_null(GuildConfigs::ChannelId))
-                    .col(integer(GuildConfigs::ReportInterval).default(60))
-                    .col(integer(GuildConfigs::Threshold).default(5))
                     .col(boolean(GuildConfigs::Enabled).default(true))
                     .col(timestamp(GuildConfigs::CreatedAt))
                     .col(timestamp(GuildConfigs::UpdatedAt))
@@ -23,42 +21,63 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 2. User Reports
+        // 2. User Configs (for user-install DM alerts)
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserConfigs::Table)
+                    .if_not_exists()
+                    .col(string(UserConfigs::UserId).primary_key())
+                    .col(boolean(UserConfigs::Enabled).default(true))
+                    .col(timestamp(UserConfigs::CreatedAt))
+                    .col(timestamp(UserConfigs::UpdatedAt))
+                    .to_owned(),
+            )
+            .await?;
+
+        // 3. User Reports (guild_id nullable for user-install reports)
         manager
             .create_table(
                 Table::create()
                     .table(UserReports::Table)
                     .if_not_exists()
                     .col(pk_auto(UserReports::Id))
-                    .col(string(UserReports::GuildId))
+                    .col(string_null(UserReports::GuildId))
                     .col(string(UserReports::UserId))
                     .col(string(UserReports::IncidentType))
                     .col(text_null(UserReports::Content))
-                    .col(string(UserReports::Status).default("pending"))
+                    .col(string(UserReports::Status).default("active"))
                     .col(timestamp(UserReports::CreatedAt))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .from(UserReports::Table, UserReports::GuildId)
-                            .to(GuildConfigs::Table, GuildConfigs::GuildId)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
                     .to_owned(),
             )
             .await?;
 
-        // Index: user_reports(guild_id, created_at)
+        // Index: user_reports(incident_type, created_at) for threshold queries
         manager
             .create_index(
                 Index::create()
-                    .name("idx_user_reports_guild_created")
+                    .name("idx_user_reports_type_created")
                     .table(UserReports::Table)
-                    .col(UserReports::GuildId)
+                    .col(UserReports::IncidentType)
                     .col(UserReports::CreatedAt)
                     .to_owned(),
             )
             .await?;
 
-        // 3. Status Logs
+        // Index: user_reports(user_id, incident_type, created_at) for duplicate check
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_user_reports_user_type_created")
+                    .table(UserReports::Table)
+                    .col(UserReports::UserId)
+                    .col(UserReports::IncidentType)
+                    .col(UserReports::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        // 4. Status Logs
         manager
             .create_table(
                 Table::create()
@@ -73,7 +92,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 4. Component Logs
+        // 5. Component Logs
         manager
             .create_table(
                 Table::create()
@@ -101,7 +120,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 5. Incidents
+        // 6. Incidents
         manager
             .create_table(
                 Table::create()
@@ -119,7 +138,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 6. Incident Updates
+        // 7. Incident Updates
         manager
             .create_table(
                 Table::create()
@@ -142,7 +161,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 7. Maintenances
+        // 8. Maintenances
         manager
             .create_table(
                 Table::create()
@@ -159,7 +178,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 8. Metric Logs
+        // 9. Metric Logs
         manager
             .create_table(
                 Table::create()
@@ -189,35 +208,31 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 9. Sent Alerts
+        // 10. Sent Alerts (guild_id and user_id both nullable, one must be set)
         manager
             .create_table(
                 Table::create()
                     .table(SentAlerts::Table)
                     .if_not_exists()
                     .col(pk_auto(SentAlerts::Id))
-                    .col(string(SentAlerts::GuildId))
+                    .col(string_null(SentAlerts::GuildId))
+                    .col(string_null(SentAlerts::UserId))
                     .col(string(SentAlerts::AlertType))
                     .col(string(SentAlerts::ReferenceId))
                     .col(timestamp(SentAlerts::NotifiedAt))
                     .col(timestamp(SentAlerts::CreatedAt))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .from(SentAlerts::Table, SentAlerts::GuildId)
-                            .to(GuildConfigs::Table, GuildConfigs::GuildId)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
                     .to_owned(),
             )
             .await?;
 
-        // Unique index: sent_alerts(guild_id, alert_type, reference_id)
+        // Unique index: sent_alerts(guild_id, user_id, alert_type, reference_id)
         manager
             .create_index(
                 Index::create()
                     .name("idx_sent_alerts_lookup")
                     .table(SentAlerts::Table)
                     .col(SentAlerts::GuildId)
+                    .col(SentAlerts::UserId)
                     .col(SentAlerts::AlertType)
                     .col(SentAlerts::ReferenceId)
                     .unique()
@@ -225,7 +240,46 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 10. Bot Config
+        // 11. Command Logs (audit trail)
+        manager
+            .create_table(
+                Table::create()
+                    .table(CommandLogs::Table)
+                    .if_not_exists()
+                    .col(pk_auto(CommandLogs::Id))
+                    .col(string(CommandLogs::CommandName))
+                    .col(string_null(CommandLogs::Subcommand))
+                    .col(string(CommandLogs::UserId))
+                    .col(string_null(CommandLogs::GuildId))
+                    .col(string_null(CommandLogs::ChannelId))
+                    .col(timestamp(CommandLogs::ExecutedAt))
+                    .to_owned(),
+            )
+            .await?;
+
+        // Index: command_logs(user_id)
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_command_logs_user_id")
+                    .table(CommandLogs::Table)
+                    .col(CommandLogs::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Index: command_logs(guild_id)
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_command_logs_guild_id")
+                    .table(CommandLogs::Table)
+                    .col(CommandLogs::GuildId)
+                    .to_owned(),
+            )
+            .await?;
+
+        // 12. Bot Config
         manager
             .create_table(
                 Table::create()
@@ -238,7 +292,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Seed default polling intervals
+        // Seed default config values
         let db = manager.get_connection();
         db.execute_unprepared(
             r#"
@@ -246,7 +300,9 @@ impl MigrationTrait for Migration {
                 ('polling.status', '60', datetime('now')),
                 ('polling.incident', '60', datetime('now')),
                 ('polling.maintenance', '60', datetime('now')),
-                ('polling.metrics', '60', datetime('now'))
+                ('polling.metrics', '60', datetime('now')),
+                ('report_threshold', '1', datetime('now')),
+                ('report_interval', '60', datetime('now'))
             "#,
         )
         .await?;
@@ -255,9 +311,12 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Drop in reverse order due to foreign key constraints
+        // Drop in reverse order
         manager
             .drop_table(Table::drop().table(BotConfig::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(CommandLogs::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(SentAlerts::Table).to_owned())
@@ -284,6 +343,9 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(UserReports::Table).to_owned())
             .await?;
         manager
+            .drop_table(Table::drop().table(UserConfigs::Table).to_owned())
+            .await?;
+        manager
             .drop_table(Table::drop().table(GuildConfigs::Table).to_owned())
             .await?;
 
@@ -300,8 +362,15 @@ enum GuildConfigs {
     Table,
     GuildId,
     ChannelId,
-    ReportInterval,
-    Threshold,
+    Enabled,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum UserConfigs {
+    Table,
+    UserId,
     Enabled,
     CreatedAt,
     UpdatedAt,
@@ -394,10 +463,23 @@ enum SentAlerts {
     Table,
     Id,
     GuildId,
+    UserId,
     AlertType,
     ReferenceId,
     NotifiedAt,
     CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum CommandLogs {
+    Table,
+    Id,
+    CommandName,
+    Subcommand,
+    UserId,
+    GuildId,
+    ChannelId,
+    ExecutedAt,
 }
 
 #[derive(DeriveIden)]

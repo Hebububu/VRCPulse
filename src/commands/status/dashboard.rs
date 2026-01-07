@@ -1,6 +1,6 @@
 //! /status dashboard command
 
-use sea_orm::{EntityTrait, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serenity::all::{
     Colour, CommandInteraction, Context, CreateAttachment, CreateCommand, CreateEmbed,
     CreateEmbedFooter, Timestamp,
@@ -38,14 +38,19 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .ok()
         .flatten();
 
-    // Fetch component statuses (latest for each component)
+    // Fetch latest component statuses (limit to recent data to avoid loading entire history)
+    // We only need the most recent status for each component
+    use chrono::{Duration, Utc};
+
+    let recent_cutoff = Utc::now() - Duration::hours(24);
     let components = component_logs::Entity::find()
+        .filter(component_logs::Column::SourceTimestamp.gt(recent_cutoff))
         .order_by_desc(component_logs::Column::SourceTimestamp)
         .all(db)
         .await
         .unwrap_or_default();
 
-    // Get unique latest components
+    // Get unique latest components (first occurrence due to DESC order)
     let mut seen_components = std::collections::HashSet::new();
     let latest_components: Vec<_> = components
         .into_iter()

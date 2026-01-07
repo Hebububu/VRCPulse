@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    pub guild_id: String,
+    pub guild_id: Option<String>,
     pub user_id: String,
     pub incident_type: String,
     #[sea_orm(column_type = "Text", nullable)]
@@ -18,21 +18,6 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::guild_configs::Entity",
-        from = "Column::GuildId",
-        to = "super::guild_configs::Column::GuildId",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    GuildConfigs,
-}
-
-impl Related<super::guild_configs::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::GuildConfigs.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}

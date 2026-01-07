@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod bot_config;
+pub mod command_logs;
 pub mod component_logs;
 pub mod guild_configs;
 pub mod incident_updates;
@@ -11,4 +12,5 @@ pub mod maintenances;
 pub mod metric_logs;
 pub mod sent_alerts;
 pub mod status_logs;
+pub mod user_configs;
 pub mod user_reports;

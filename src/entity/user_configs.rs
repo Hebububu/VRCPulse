@@ -4,11 +4,10 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "guild_configs")]
+#[sea_orm(table_name = "user_configs")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub guild_id: String,
-    pub channel_id: Option<String>,
+    pub user_id: String,
     pub enabled: bool,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
