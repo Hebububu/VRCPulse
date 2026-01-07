@@ -10,51 +10,57 @@ We use **SQLite** as the primary data store and **Sea-ORM** as the Object-Relati
 
 ## Source Files
 
-| Component | File | Lines |
-|-----------|------|-------|
-| Migration (all tables) | `migration/src/m20260103_001_create_table.rs` | 1-410 |
-| Guild configs entity | `src/entity/guild_configs.rs` | 1-39 |
-| User reports entity | `src/entity/user_reports.rs` | 1-38 |
-| Status logs entity | `src/entity/status_logs.rs` | 1-22 |
-| Component logs entity | `src/entity/component_logs.rs` | 1-21 |
-| Incidents entity | `src/entity/incidents.rs` | 1-32 |
-| Incident updates entity | `src/entity/incident_updates.rs` | 1-38 |
-| Maintenances entity | `src/entity/maintenances.rs` | 1-22 |
-| Metric logs entity | `src/entity/metric_logs.rs` | 1-25 |
-| Sent alerts entity | `src/entity/sent_alerts.rs` | 1-39 |
-| Bot config entity | `src/entity/bot_config.rs` | 1-18 |
+| Component | File |
+|-----------|------|
+| Migration (all tables) | `migration/src/m20260103_001_create_table.rs` |
+| Entity modules | `src/entity/*.rs` |
+| Entity prelude | `src/entity/prelude.rs` |
 
 ---
 
 ## Tables
 
 ### 1. Guild Configuration (`guild_configs`)
-Stores Discord server (guild) specific settings.
+Stores Discord server (guild) registration and settings.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `guild_id` | String | PK | Discord Guild ID |
-| `channel_id` | String | Nullable | Designated channel for status updates |
-| `report_interval` | Integer | Default: 60 | Interval in minutes for scheduled reports |
-| `threshold` | Integer | Default: 5 | User report count to trigger a broadcast alert |
-| `enabled` | Boolean | Default: true | Whether the bot is active for this guild |
-| `created_at` | DateTime | | |
-| `updated_at` | DateTime | | |
+| `channel_id` | String | Nullable | Designated channel for alerts |
+| `enabled` | Boolean | Default: true | Whether alerts are active for this guild |
+| `created_at` | DateTime | | Registration timestamp |
+| `updated_at` | DateTime | | Last modification |
 
-### 2. User Incident Reports (`user_reports`)
+> **Note**: Threshold and interval settings are global (see `bot_config` table).
+
+### 2. User Configuration (`user_configs`)
+Stores user registration for DM alerts (user-install context).
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `user_id` | String | PK | Discord User ID |
+| `enabled` | Boolean | Default: true | Whether DM alerts are active |
+| `created_at` | DateTime | | Registration timestamp |
+| `updated_at` | DateTime | | Last modification |
+
+### 3. User Incident Reports (`user_reports`)
 Stores outage reports submitted by users via `/report`.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | Integer | PK, AutoInc | Unique report ID |
-| `guild_id` | String | FK (guild_configs) | Origin guild of the report |
+| `guild_id` | String | Nullable | Origin guild (null for user-install) |
 | `user_id` | String | | Discord User ID of the reporter |
 | `incident_type` | String | | e.g., 'login', 'instance', 'api' |
 | `content` | Text | Nullable | Detailed description from the user |
-| `status` | String | Default: 'pending' | `pending`, `acknowledged`, `dismissed` |
+| `status` | String | Default: 'active' | Report status |
 | `created_at` | DateTime | | |
 
-### 3. System Status Logs (`status_logs`)
+**Indexes**:
+- `idx_user_reports_type_created`: `(incident_type, created_at)` for threshold queries
+- `idx_user_reports_user_type_created`: `(user_id, incident_type, created_at)` for duplicate check
+
+### 4. System Status Logs (`status_logs`)
 Stores overall system status snapshots from VRChat Status API.
 
 | Column | Type | Constraints | Description |
@@ -65,7 +71,7 @@ Stores overall system status snapshots from VRChat Status API.
 | `source_timestamp` | DateTime | Unique | `page.updated_at` from API to prevent duplicates |
 | `created_at` | DateTime | | |
 
-### 4. Component Status Logs (`component_logs`)
+### 5. Component Status Logs (`component_logs`)
 Stores individual component status (e.g., API, Website) for history tracking.
 
 | Column | Type | Constraints | Description |
@@ -77,7 +83,7 @@ Stores individual component status (e.g., API, Website) for history tracking.
 | `source_timestamp` | DateTime | | Timestamp when this status was captured |
 | `created_at` | DateTime | | |
 
-### 5. Official Incidents (`incidents`)
+### 6. Official Incidents (`incidents`)
 Stores official incident records from VRChat.
 
 | Column | Type | Constraints | Description |
@@ -91,7 +97,7 @@ Stores official incident records from VRChat.
 | `created_at` | DateTime | | |
 | `updated_at` | DateTime | | |
 
-### 6. Incident Updates (`incident_updates`)
+### 7. Incident Updates (`incident_updates`)
 Stores chronological updates for each incident.
 
 | Column | Type | Constraints | Description |
@@ -104,7 +110,7 @@ Stores chronological updates for each incident.
 | `created_at` | DateTime | | |
 | `updated_at` | DateTime | | |
 
-### 7. Scheduled Maintenances (`maintenances`)
+### 8. Scheduled Maintenances (`maintenances`)
 Stores planned maintenance information.
 
 | Column | Type | Constraints | Description |
@@ -117,7 +123,7 @@ Stores planned maintenance information.
 | `created_at` | DateTime | | |
 | `updated_at` | DateTime | | |
 
-### 8. Performance Metrics (`metric_logs`)
+### 9. Performance Metrics (`metric_logs`)
 Stores time-series data from CloudFront Metrics.
 
 | Column | Type | Constraints | Description |
@@ -132,38 +138,56 @@ Stores time-series data from CloudFront Metrics.
 
 > **Note**: Composite unique constraint on `(metric_name, timestamp)` prevents duplicate data points.
 
-### 9. Sent Alerts (`sent_alerts`)
-Tracks which alerts have been sent to which guilds to prevent duplicate notifications.
+### 10. Sent Alerts (`sent_alerts`)
+Tracks which alerts have been sent to prevent duplicate notifications.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | Integer | PK, AutoInc | |
-| `guild_id` | String | FK (guild_configs) | Target guild |
+| `guild_id` | String | Nullable | Target guild (null for user alerts) |
+| `user_id` | String | Nullable | Target user (null for guild alerts) |
 | `alert_type` | String | | `incident`, `maintenance`, `threshold` |
-| `reference_id` | String | | ID of the incident/maintenance/etc. |
+| `reference_id` | String | | ID of the incident/maintenance/time-block |
 | `notified_at` | DateTime | | When the alert was sent |
 | `created_at` | DateTime | | |
 
-> **Note**: Composite unique constraint on `(guild_id, alert_type, reference_id)` prevents duplicate alerts.
+> **Note**: Composite unique constraint on `(guild_id, user_id, alert_type, reference_id)` prevents duplicate alerts. Either `guild_id` or `user_id` is set, not both.
 
-### 10. Bot Configuration (`bot_config`)
+### 11. Bot Configuration (`bot_config`)
 Global bot configuration storage (key-value pairs).
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `key` | String | PK | Configuration key (e.g., `polling.status`) |
-| `value` | String | | Configuration value (JSON-serialized if needed) |
+| `key` | String | PK | Configuration key |
+| `value` | String | | Configuration value |
 | `updated_at` | DateTime | | Last modification time |
 
-**Default Keys:**
+**Seeded Keys:**
 | Key | Default Value | Description |
 | :--- | :--- | :--- |
 | `polling.status` | `60` | Status poller interval (seconds) |
 | `polling.incident` | `60` | Incident poller interval (seconds) |
 | `polling.maintenance` | `60` | Maintenance poller interval (seconds) |
 | `polling.metrics` | `60` | Metrics poller interval (seconds) |
+| `report_threshold` | `1` | Reports needed to trigger alert |
+| `report_interval` | `60` | Time window for counting reports (minutes) |
 
-**Source**: `migration/src/m20260103_001_create_table.rs:246-249`
+### 12. Command Logs (`command_logs`)
+Audit trail for slash command executions.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | Integer | PK, AutoInc | |
+| `command_name` | String | | Command name (e.g., 'config') |
+| `subcommand` | String | Nullable | Subcommand if any (e.g., 'setup') |
+| `user_id` | String | | User who executed |
+| `guild_id` | String | Nullable | Guild context (null for DMs) |
+| `channel_id` | String | Nullable | Channel where executed |
+| `executed_at` | DateTime | | Execution timestamp |
+
+**Indexes**:
+- `idx_command_logs_user_id`: For user activity queries
+- `idx_command_logs_guild_id`: For guild activity queries
 
 ---
 
@@ -175,29 +199,37 @@ Global bot configuration storage (key-value pairs).
 
 ### Relationships
 - `incidents` (1) ↔ (N) `incident_updates`
-- `guild_configs` (1) ↔ (N) `user_reports`
-- `guild_configs` (1) ↔ (N) `sent_alerts`
+
+> **Note**: `user_reports` and `sent_alerts` previously had FKs to `guild_configs`, but these were removed to support user-install context where `guild_id` is null.
 
 ### Indexes
 
-The following indexes are recommended for query performance:
+All indexes are created in migration. Key indexes:
 
 ```sql
--- User reports: count reports within time window per guild
-CREATE INDEX idx_user_reports_guild_created
-ON user_reports(guild_id, created_at);
+-- User reports: threshold queries by incident type
+CREATE INDEX idx_user_reports_type_created
+ON user_reports(incident_type, created_at);
+
+-- User reports: duplicate/cooldown check
+CREATE INDEX idx_user_reports_user_type_created
+ON user_reports(user_id, incident_type, created_at);
 
 -- Component logs: query history by component
 CREATE INDEX idx_component_logs_component_time
 ON component_logs(component_id, source_timestamp);
 
--- Metric logs: time-series range queries
-CREATE INDEX idx_metric_logs_name_time
+-- Metric logs: time-series range queries (unique)
+CREATE UNIQUE INDEX idx_metric_logs_name_time
 ON metric_logs(metric_name, timestamp);
 
--- Sent alerts: check if alert was already sent
-CREATE INDEX idx_sent_alerts_lookup
-ON sent_alerts(guild_id, alert_type, reference_id);
+-- Sent alerts: deduplication (unique)
+CREATE UNIQUE INDEX idx_sent_alerts_lookup
+ON sent_alerts(guild_id, user_id, alert_type, reference_id);
+
+-- Command logs: activity queries
+CREATE INDEX idx_command_logs_user_id ON command_logs(user_id);
+CREATE INDEX idx_command_logs_guild_id ON command_logs(guild_id);
 ```
 
 ---

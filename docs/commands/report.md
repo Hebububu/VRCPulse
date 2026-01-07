@@ -6,21 +6,21 @@ User incident reporting command for VRChat issues.
 
 ## Status
 
-> **[NOT IMPLEMENTED]**: This command is documented but not yet implemented. The database schema is in place, but the Discord slash command handler does not exist.
+> **[IMPLEMENTED]**: This command is fully implemented.
 
 ---
 
 ## Usage
 
 ```
-/report <incident_type> [details]
+/report <type> [details]
 ```
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `incident_type` | Choice | Yes | Type of issue being reported |
+| `type` | Choice | Yes | Type of issue being reported |
 | `details` | String | No | Additional context (max 500 chars) |
 
 ### Incident Types (Choices)
@@ -38,49 +38,86 @@ User incident reporting command for VRChat issues.
 
 ## Behavior Flow
 
-### 1. Guild Configuration Check
+### 1. Registration Check
 
-Verify guild is configured before accepting reports.
-
-- **Requirement**: `guild_configs` entry must exist for the guild
-- **Error if missing**: "Guild not configured. Admin must run `/config setup` first."
+- **Guild context**: Requires `guild_configs.enabled = true`
+- **User context**: Requires `user_configs.enabled = true`
+- **Unregistered user**: Shows intro embed with setup instructions
 
 ### 2. Duplicate Prevention
 
-Prevent spam from same user reporting same issue type.
-
 - **Window**: 5 minutes
-- **Key**: `(guild_id, user_id, incident_type)`
-- **Error if duplicate**: "You already reported this issue recently."
+- **Scope**: Per user globally (any report within window triggers cooldown)
+- **Response**: Shows when user can report again
 
-### 3. Store Report
+### 3. Details Validation
 
-Insert report into `user_reports` table.
+- **Max length**: 500 characters
+- **Error**: Shows character count if exceeded
 
-### 4. User Confirmation
+### 4. Store Report
 
-Return success embed to user.
+- Inserts into `user_reports` table
+- `status` = `active`
+- `guild_id` = null for user-install context
+
+### 5. Response
+
+- Shows success with count of similar reports
+- Anonymous (no guild/user names shown)
 
 ---
 
-## Response
+## Response Examples
 
-### Success Response
-
+### Success
 ```
-[Title] Report Submitted
-[Description] Thank you for reporting {incident_type}.
-[Color] Green (0x57f287)
-[Footer] If multiple users report this issue, an alert will be sent.
+Report Submitted
+
+Thank you for reporting Login Issues.
+
+6 others reported this issue in the last 60 minutes.
+
+[Footer] Your report helps us detect widespread issues.
 ```
 
-### Error Responses
+### Duplicate (cooldown)
+```
+Report Cooldown
 
-| Situation | Title | Description |
-| :--- | :--- | :--- |
-| Guild not configured | Configuration Required | An administrator must run `/config setup` first. |
-| Duplicate report (5 min) | Report Cooldown | You already reported this issue recently. |
-| Details too long | Validation Error | Details must be under 500 characters. |
+You recently submitted a report.
+You can report again <t:1736251234:R>.
+```
+
+### User Not Registered (user-install)
+```
+Welcome to VRCPulse!
+
+VRCPulse monitors VRChat server status and alerts you when issues occur.
+
+Getting Started:
+1. Run /config setup to register for DM alerts
+2. Check current VRChat status with /status
+
+[Footer] Run /config setup to start receiving alerts and submit reports!
+```
+
+---
+
+## Global Report Pool
+
+Reports from all sources (guilds + user-install) contribute to a single global count per incident type. Guild/user identities are kept anonymous in responses.
+
+---
+
+## Configuration
+
+Global settings in `bot_config` table:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `report_threshold` | 5 | Reports needed to trigger alert |
+| `report_interval` | 60 | Time window (minutes) for counting |
 
 ---
 
@@ -88,37 +125,34 @@ Return success embed to user.
 
 ### Source Files
 
-> **[PLANNED]**: Command files do not exist yet.
+| Component | File |
+|-----------|------|
+| Command definition | `src/commands/report.rs` |
+| Handler | `src/commands/report.rs` |
+| Registration check | `src/commands/report.rs` |
+| Atomic insert with race handling | `src/commands/report.rs` |
+| Report count query | `src/commands/report.rs` |
 
-| Component | Planned File |
-|-----------|--------------|
-| Command definition | `src/commands/report.rs` [PLANNED] |
+### Database Tables
 
-### Database Tables (Schema Ready)
+| Table | Purpose |
+|-------|---------|
+| `user_reports` | Store submitted reports |
+| `guild_configs` | Check guild registration |
+| `user_configs` | Check user registration |
+| `bot_config` | Global threshold settings |
 
-| Table | Purpose | Entity |
-|-------|---------|--------|
-| `user_reports` | Store submitted reports | `src/entity/user_reports.rs:1-38` |
-| `guild_configs` | Check guild configuration | `src/entity/guild_configs.rs:1-39` |
+### Status Field
 
-**Migration**: `migration/src/m20260103_001_create_table.rs:26-47`
+| Status | Description |
+|--------|-------------|
+| `active` | Active report (used for counting and alerts) |
 
----
-
-## Implementation Checklist
-
-- [ ] Create command definition in `src/commands/report.rs`
-- [ ] Add slash command registration in `src/commands/mod.rs`
-- [ ] Implement guild config check
-- [ ] Implement duplicate prevention (5-min window)
-- [ ] Implement report insertion
-- [ ] Create user confirmation embed
-- [ ] Add handler in `src/main.rs`
+> **Note**: Currently only `active` status is used. Future versions may add `resolved` or `expired` for report lifecycle management.
 
 ---
 
 ## Related Documents
 
-- `docs/commands/config.md` - Guild configuration command (prerequisite)
+- `docs/commands/config.md` - Registration command (prerequisite)
 - `docs/alerts/policy-user-threshold.md` - Alert triggering logic
-- `docs/system/database-schema.md` - Table definitions
