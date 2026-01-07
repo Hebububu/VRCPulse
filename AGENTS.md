@@ -373,11 +373,35 @@ mod tests {
 ## Environment Configuration
 
 ```bash
-# .env file (create from .env.example)
+# .env file (create from .env.example) - for production
 DISCORD_TOKEN=your_discord_bot_token_here
 TEST_GUILD_ID=123456789012345678  # Optional, for development
 DATABASE_URL=sqlite://data/vrcpulse.db?mode=rwc
 RUST_LOG=info,vrc_pulse=debug
+```
+
+### Development Environment
+
+**IMPORTANT**: Use `.env.test` for development to avoid affecting production data.
+
+```bash
+# .env.test - for development/testing
+DISCORD_TOKEN=your_test_bot_token_here
+TEST_GUILD_ID=123456789012345678
+DATABASE_URL=sqlite://data/vrcpulse_test.db?mode=rwc
+RUST_LOG=debug,vrc_pulse=trace
+```
+
+**Running with test environment**:
+```bash
+# Load .env.test instead of .env
+cp .env.test .env  # Or use direnv/dotenv tools
+
+# Run migrations on test database
+sea-orm-cli migrate up
+
+# Run the bot
+cargo run
 ```
 
 ## Documentation

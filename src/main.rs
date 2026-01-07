@@ -5,10 +5,14 @@ mod config;
 mod database;
 mod entity;
 mod error;
+mod i18n;
 mod logging;
 mod repository;
 mod state;
 mod visualization;
+
+// Initialize rust-i18n with locales from the `locales` directory
+rust_i18n::i18n!("locales");
 
 use chrono::Utc;
 use config::Config;

@@ -10,6 +10,7 @@ pub struct Model {
     pub guild_id: String,
     pub channel_id: Option<String>,
     pub enabled: bool,
+    pub language: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

@@ -69,14 +69,14 @@ assets/
 
 **Goal**: Establish translation infrastructure with rust-i18n crate
 
-**Status**: [o] In progress
+**Status**: [x] Complete
 
 **Tasks**:
-- [ ] Add `rust-i18n` dependency to `Cargo.toml`
+- [x] Add `rust-i18n` dependency to `Cargo.toml`
 - [x] Create `locales/en.json` with all English strings
 - [x] Create `locales/ko.json` with Korean translations
-- [ ] Create `src/i18n/mod.rs` with initialization and helper functions
-- [ ] Add i18n initialization to `main.rs`
+- [x] Create `src/i18n/mod.rs` with initialization and helper functions
+- [x] Add i18n initialization to `main.rs`
 
 **Files to Create**:
 | File | Description |
@@ -123,21 +123,21 @@ assets/
 
 **Goal**: Add language preference storage and configuration command
 
-**Status**: [ ] Not started
+**Status**: [o] In progress
 
 **Tasks**:
-- [ ] Create migration `m20260108_002_add_language_column.rs`
-- [ ] Add `language` column to `guild_configs` table
-- [ ] Add `language` column to `user_configs` table
-- [ ] Regenerate entities with `sea-orm-cli generate entity`
-- [ ] Add `update_language()` methods to repositories
+- [x] Create migration `m20260108_001_add_language_column.rs`
+- [x] Add `language` column to `guild_configs` table
+- [x] Add `language` column to `user_configs` table
+- [x] Update entities manually (language field added)
+- [x] Add `update_language()` methods to repositories
 - [ ] Implement `/config language` subcommand
 - [ ] Add language embed builders
 
 **Files to Create/Modify**:
 | File | Action |
 |------|--------|
-| `migration/src/m20260108_002_add_language_column.rs` | CREATE |
+| `migration/src/m20260108_001_add_language_column.rs` | CREATE |
 | `migration/src/lib.rs` | MODIFY - register migration |
 | `src/entity/guild_configs.rs` | REGENERATE |
 | `src/entity/user_configs.rs` | REGENERATE |

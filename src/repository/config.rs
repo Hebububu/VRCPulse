@@ -45,10 +45,27 @@ impl GuildConfigRepository {
             guild_id: Set(guild_id.to_string()),
             channel_id: Set(Some(channel_id.to_string())),
             enabled: Set(true),
+            language: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         };
         model.insert(&*self.db).await
+    }
+
+    /// Update guild language preference
+    pub async fn update_language(
+        &self,
+        guild_id: GuildId,
+        language: Option<String>,
+    ) -> Result<guild_configs::Model, sea_orm::DbErr> {
+        let now = Utc::now();
+        let model = guild_configs::ActiveModel {
+            guild_id: Set(guild_id.to_string()),
+            language: Set(language),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        model.update(&*self.db).await
     }
 
     /// Re-enable existing guild config with new channel
@@ -135,10 +152,27 @@ impl UserConfigRepository {
         let model = user_configs::ActiveModel {
             user_id: Set(user_id.to_string()),
             enabled: Set(true),
+            language: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         };
         model.insert(&*self.db).await
+    }
+
+    /// Update user language preference
+    pub async fn update_language(
+        &self,
+        user_id: UserId,
+        language: Option<String>,
+    ) -> Result<user_configs::Model, sea_orm::DbErr> {
+        let now = Utc::now();
+        let model = user_configs::ActiveModel {
+            user_id: Set(user_id.to_string()),
+            language: Set(language),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        model.update(&*self.db).await
     }
 
     /// Re-enable existing user config
