@@ -1,18 +1,34 @@
+//! /admin command - Bot owner only administration
+
+use chrono::Utc;
 use serenity::all::{
-    Colour, CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
-    Permissions, ResolvedValue, Timestamp,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, Permissions, ResolvedValue,
 };
 use tracing::error;
 
 use crate::collector::config::{DEFAULT_INTERVAL, PollerType, get_interval, validate_interval};
-use crate::state::{AppState, AppStateKey};
+use crate::commands::shared::respond_error;
+use crate::database;
+use crate::repository::{GuildConfigRepository, UserConfigRepository};
+use crate::state::AppStateKey;
 
-/// /admin config command definition
+use super::embeds;
+
+// =============================================================================
+// Command Registration
+// =============================================================================
+
+/// /admin command definition
 pub fn register() -> CreateCommand {
     CreateCommand::new("admin")
-        .description("Admin commands")
+        .description("Bot owner commands")
         .default_member_permissions(Permissions::ADMINISTRATOR)
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "show",
+            "Display bot information and available commands",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommandGroup,
@@ -61,54 +77,155 @@ pub fn register() -> CreateCommand {
         )
 }
 
-/// /admin config command handler
+// =============================================================================
+// Command Handler
+// =============================================================================
+
+/// /admin command handler (owner-only)
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
-    // Get AppState from TypeMap
-    let data = ctx.data.read().await;
-    let state = data
-        .get::<AppStateKey>()
-        .expect("AppState not found in TypeMap");
-    let state = state.read().await;
+    // Check if user is bot owner (silent ignore if not)
+    if !is_owner(ctx, interaction).await {
+        return Ok(());
+    }
 
-    // Parse subcommand group and subcommand
+    let db = database::get_db(ctx).await;
+
+    // Parse subcommand
     let options = &interaction.data.options();
-
-    // Find the "config" subcommand group
-    let config_group = options.iter().find(|opt| opt.name == "config");
-
-    let Some(config_group) = config_group else {
-        return respond_error(ctx, interaction, "Unknown subcommand").await;
+    let Some(first_opt) = options.first() else {
+        return Ok(());
     };
 
-    let ResolvedValue::SubCommandGroup(subcommands) = &config_group.value else {
-        return respond_error(ctx, interaction, "Invalid command structure").await;
-    };
-
-    let Some(subcommand) = subcommands.first() else {
-        return respond_error(ctx, interaction, "Missing subcommand").await;
-    };
-
-    match subcommand.name {
-        "show" => handle_show(ctx, interaction, &state).await,
-        "set" => {
-            let ResolvedValue::SubCommand(options) = &subcommand.value else {
+    match first_opt.name {
+        "show" => handle_admin_show(ctx, interaction).await,
+        "config" => {
+            let ResolvedValue::SubCommandGroup(subcommands) = &first_opt.value else {
                 return respond_error(ctx, interaction, "Invalid command structure").await;
             };
-            handle_set(ctx, interaction, &state, options).await
+
+            let Some(subcommand) = subcommands.first() else {
+                return respond_error(ctx, interaction, "Missing subcommand").await;
+            };
+
+            match subcommand.name {
+                "show" => handle_config_show(ctx, interaction, &db).await,
+                "set" => {
+                    let ResolvedValue::SubCommand(options) = &subcommand.value else {
+                        return respond_error(ctx, interaction, "Invalid command structure").await;
+                    };
+                    handle_config_set(ctx, interaction, &db, options).await
+                }
+                "reset" => handle_config_reset(ctx, interaction, &db).await,
+                _ => Ok(()),
+            }
         }
-        "reset" => handle_reset(ctx, interaction, &state).await,
-        _ => respond_error(ctx, interaction, "Unknown subcommand").await,
+        _ => Ok(()),
     }
 }
 
-/// Handle /admin config show
-async fn handle_show(
+// =============================================================================
+// Owner Check
+// =============================================================================
+
+/// Check if the user is the bot owner
+async fn is_owner(ctx: &Context, interaction: &CommandInteraction) -> bool {
+    match ctx.http.get_current_application_info().await {
+        Ok(app_info) => app_info
+            .owner
+            .as_ref()
+            .is_some_and(|owner| owner.id == interaction.user.id),
+        Err(e) => {
+            error!(error = %e, "Failed to get application info for owner check");
+            false
+        }
+    }
+}
+
+// =============================================================================
+// Admin Show Handler
+// =============================================================================
+
+/// Handle /admin show - display bot info and command summary
+async fn handle_admin_show(
     ctx: &Context,
     interaction: &CommandInteraction,
-    state: &AppState,
 ) -> Result<(), serenity::Error> {
-    let db = state.database.as_ref();
+    let db = database::get_db(ctx).await;
 
+    // Get uptime from AppState
+    let uptime = {
+        let data = ctx.data.read().await;
+        let state = data.get::<AppStateKey>().expect("AppState not found");
+        let started_at = state.read().await.started_at;
+        format_uptime(started_at)
+    };
+
+    // Get counts
+    let guild_count = ctx.cache.guild_count() as u64;
+    let registered_guilds = GuildConfigRepository::new(db.clone())
+        .count_enabled()
+        .await
+        .unwrap_or(0);
+    let registered_users = UserConfigRepository::new(db.clone())
+        .count_enabled()
+        .await
+        .unwrap_or(0);
+
+    // Get polling intervals
+    let format_interval = |result: Result<u64, _>| match result {
+        Ok(secs) => format!("{}s", secs),
+        Err(_) => "Error".to_string(),
+    };
+
+    let status_interval = format_interval(get_interval(&db, PollerType::Status).await);
+    let incident_interval = format_interval(get_interval(&db, PollerType::Incident).await);
+    let maintenance_interval = format_interval(get_interval(&db, PollerType::Maintenance).await);
+    let metrics_interval = format_interval(get_interval(&db, PollerType::Metrics).await);
+
+    let embed = embeds::admin_show(
+        env!("CARGO_PKG_VERSION"),
+        &uptime,
+        guild_count,
+        registered_guilds,
+        registered_users,
+        &status_interval,
+        &incident_interval,
+        &maintenance_interval,
+        &metrics_interval,
+    );
+
+    let response = CreateInteractionResponseMessage::new().embed(embed);
+    interaction
+        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
+        .await
+}
+
+/// Format uptime duration as human-readable string
+fn format_uptime(started_at: chrono::DateTime<Utc>) -> String {
+    let duration = Utc::now() - started_at;
+    let days = duration.num_days();
+    let hours = duration.num_hours() % 24;
+    let minutes = duration.num_minutes() % 60;
+
+    if days > 0 {
+        format!("{}d {}h {}m", days, hours, minutes)
+    } else if hours > 0 {
+        format!("{}h {}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
+    }
+}
+
+// =============================================================================
+// Config Handlers
+// =============================================================================
+
+/// Handle /admin config show
+async fn handle_config_show(
+    ctx: &Context,
+    interaction: &CommandInteraction,
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), serenity::Error> {
     // Load current intervals from database
     let status = get_interval(db, PollerType::Status).await;
     let incident = get_interval(db, PollerType::Incident).await;
@@ -120,14 +237,12 @@ async fn handle_show(
         Err(_) => "Error".to_string(),
     };
 
-    let embed = CreateEmbed::default()
-        .title("Polling Intervals")
-        .color(Colour::new(0x00b0f4))
-        .field("Status", format_interval(status), true)
-        .field("Incident", format_interval(incident), true)
-        .field("Maintenance", format_interval(maintenance), true)
-        .field("Metrics", format_interval(metrics), true)
-        .footer(CreateEmbedFooter::new("Use /admin config set to change"));
+    let embed = embeds::show_intervals(
+        &format_interval(status),
+        &format_interval(incident),
+        &format_interval(maintenance),
+        &format_interval(metrics),
+    );
 
     let response = CreateInteractionResponseMessage::new().embed(embed);
     interaction
@@ -136,10 +251,10 @@ async fn handle_show(
 }
 
 /// Handle /admin config set <poller> <seconds>
-async fn handle_set<'a>(
+async fn handle_config_set<'a>(
     ctx: &Context,
     interaction: &CommandInteraction,
-    state: &AppState,
+    db: &sea_orm::DatabaseConnection,
     options: &[serenity::all::ResolvedOption<'a>],
 ) -> Result<(), serenity::Error> {
     // Parse options
@@ -174,20 +289,13 @@ async fn handle_set<'a>(
         return respond_error(ctx, interaction, &msg).await;
     }
 
-    // Update interval
-    let db = state.database.as_ref();
-    if let Err(e) = state.collector_config.update(db, poller, seconds).await {
+    // Update interval in database
+    if let Err(e) = crate::collector::config::set_interval(db, poller, seconds).await {
         error!(error = %e, "Failed to update polling interval");
         return respond_error(ctx, interaction, "Failed to save configuration").await;
     }
 
-    let embed = CreateEmbed::default()
-        .title("Configuration Updated")
-        .description("Polling interval has been changed.")
-        .color(Colour::new(0x57f287))
-        .field("Poller", poller.as_str(), true)
-        .field("New Interval", format!("{}s", seconds), true)
-        .timestamp(Timestamp::now());
+    let embed = embeds::config_updated(poller.as_str(), seconds);
 
     let response = CreateInteractionResponseMessage::new().embed(embed);
     interaction
@@ -196,51 +304,23 @@ async fn handle_set<'a>(
 }
 
 /// Handle /admin config reset
-async fn handle_reset(
+async fn handle_config_reset(
     ctx: &Context,
     interaction: &CommandInteraction,
-    state: &AppState,
+    db: &sea_orm::DatabaseConnection,
 ) -> Result<(), serenity::Error> {
-    let db = state.database.as_ref();
-
-    if let Err(e) = state.collector_config.reset_all(db).await {
-        error!(error = %e, "Failed to reset polling intervals");
-        return respond_error(ctx, interaction, "Failed to reset configuration").await;
+    // Reset all pollers to default
+    for poller in PollerType::all() {
+        if let Err(e) = crate::collector::config::set_interval(db, *poller, DEFAULT_INTERVAL).await
+        {
+            error!(error = %e, poller = ?poller, "Failed to reset polling interval");
+            return respond_error(ctx, interaction, "Failed to reset configuration").await;
+        }
     }
 
-    let default_str = format!("{}s", DEFAULT_INTERVAL);
-
-    let embed = CreateEmbed::default()
-        .title("Configuration Reset")
-        .description("All polling intervals have been reset to default values.")
-        .color(Colour::new(0x57f287))
-        .field("Status", &default_str, true)
-        .field("Incident", &default_str, true)
-        .field("Maintenance", &default_str, true)
-        .field("Metrics", &default_str, true)
-        .timestamp(Timestamp::now());
+    let embed = embeds::config_reset(DEFAULT_INTERVAL);
 
     let response = CreateInteractionResponseMessage::new().embed(embed);
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
-}
-
-/// Send an error response
-async fn respond_error(
-    ctx: &Context,
-    interaction: &CommandInteraction,
-    message: &str,
-) -> Result<(), serenity::Error> {
-    let embed = CreateEmbed::default()
-        .title("Error")
-        .description(message)
-        .color(Colour::new(0xed4245));
-
-    let response = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-
     interaction
         .create_response(&ctx.http, CreateInteractionResponse::Message(response))
         .await

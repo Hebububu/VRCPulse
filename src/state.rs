@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -19,6 +20,8 @@ pub struct AppState {
     pub database: Arc<DatabaseConnection>,
     /// Collector config sender for dynamic interval updates
     pub collector_config: CollectorConfigTx,
+    /// Bot startup timestamp
+    pub started_at: DateTime<Utc>,
 }
 
 impl AppState {
@@ -27,6 +30,7 @@ impl AppState {
         Self {
             database: Arc::new(database),
             collector_config,
+            started_at: Utc::now(),
         }
     }
 }

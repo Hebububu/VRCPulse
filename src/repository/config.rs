@@ -1,7 +1,10 @@
 //! Repository for guild and user configuration
 
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
+};
 use serenity::all::{ChannelId, GuildId, UserId};
 use std::sync::Arc;
 
@@ -92,6 +95,14 @@ impl GuildConfigRepository {
         };
         model.update(&*self.db).await
     }
+
+    /// Count enabled guild configs
+    pub async fn count_enabled(&self) -> Result<u64, sea_orm::DbErr> {
+        guild_configs::Entity::find()
+            .filter(guild_configs::Column::Enabled.eq(true))
+            .count(&*self.db)
+            .await
+    }
 }
 
 // =============================================================================
@@ -152,5 +163,13 @@ impl UserConfigRepository {
             ..Default::default()
         };
         model.update(&*self.db).await
+    }
+
+    /// Count enabled user configs
+    pub async fn count_enabled(&self) -> Result<u64, sea_orm::DbErr> {
+        user_configs::Entity::find()
+            .filter(user_configs::Column::Enabled.eq(true))
+            .count(&*self.db)
+            .await
     }
 }
