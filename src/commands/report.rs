@@ -1,6 +1,7 @@
 //! /report command - User incident reporting for VRChat issues
 
 use chrono::{Duration, Utc};
+use rust_i18n::t;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
@@ -12,6 +13,7 @@ use serenity::all::{
 use tracing::{error, info};
 
 use crate::entity::{bot_config, guild_configs, user_configs, user_reports};
+use crate::i18n::resolve_locale_async;
 use crate::state::AppStateKey;
 
 // =============================================================================
@@ -37,23 +39,33 @@ const COLOR_WARNING: u32 = 0xfee75c;
 // Incident Types
 // =============================================================================
 
-/// Available incident types for reporting
-const INCIDENT_TYPES: &[(&str, &str)] = &[
-    ("login", "Login Issues"),
-    ("instance", "Instance/World Loading"),
-    ("api", "API/Website Issues"),
-    ("auth", "Authentication Issues"),
-    ("download", "Content Download Issues"),
-    ("other", "Other Issues"),
-];
+/// Available incident type keys for reporting
+const INCIDENT_TYPE_KEYS: &[&str] = &["login", "instance", "api", "auth", "download", "other"];
 
-/// Get display name for incident type
-fn get_incident_display_name(incident_type: &str) -> &str {
-    INCIDENT_TYPES
-        .iter()
-        .find(|(value, _)| *value == incident_type)
-        .map(|(_, display)| *display)
-        .unwrap_or(incident_type)
+/// Get display name for incident type using i18n
+fn get_incident_display_name(incident_type: &str) -> String {
+    match incident_type {
+        "login" => t!("incident_types.login").to_string(),
+        "instance" => t!("incident_types.instance").to_string(),
+        "api" => t!("incident_types.api").to_string(),
+        "auth" => t!("incident_types.auth").to_string(),
+        "download" => t!("incident_types.download").to_string(),
+        "other" => t!("incident_types.other").to_string(),
+        _ => incident_type.to_string(),
+    }
+}
+
+/// Get localized display name for incident type
+fn get_incident_display_name_localized(incident_type: &str, locale: &str) -> String {
+    match incident_type {
+        "login" => t!("incident_types.login", locale = locale).to_string(),
+        "instance" => t!("incident_types.instance", locale = locale).to_string(),
+        "api" => t!("incident_types.api", locale = locale).to_string(),
+        "auth" => t!("incident_types.auth", locale = locale).to_string(),
+        "download" => t!("incident_types.download", locale = locale).to_string(),
+        "other" => t!("incident_types.other", locale = locale).to_string(),
+        _ => incident_type.to_string(),
+    }
 }
 
 // =============================================================================
@@ -65,30 +77,43 @@ pub fn register() -> CreateCommand {
     let mut incident_type_option = CreateCommandOption::new(
         CommandOptionType::String,
         "type",
-        "Type of issue you're experiencing",
+        t!("commands.report.option_type"),
     )
+    .name_localized("ko", "유형")
+    .description_localized("ko", t!("commands.report.option_type", locale = "ko"))
     .required(true);
 
-    // Add choices for incident types
-    for (value, display) in INCIDENT_TYPES {
-        incident_type_option = incident_type_option.add_string_choice(*display, *value);
+    // Add choices for incident types with localization
+    for key in INCIDENT_TYPE_KEYS {
+        let display_en = get_incident_display_name(key);
+        let display_ko = get_incident_display_name_localized(key, "ko");
+        incident_type_option = incident_type_option.add_string_choice_localized(
+            display_en,
+            *key,
+            [("ko", display_ko)],
+        );
     }
 
     CreateCommand::new("report")
-        .description("Report a VRChat issue")
+        .description(t!("commands.report.description"))
+        .name_localized("ko", t!("commands.report.name", locale = "ko"))
+        .description_localized("ko", t!("commands.report.description", locale = "ko"))
         .add_option(incident_type_option)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "details",
-                "Additional details about the issue (max 500 chars)",
+                t!("commands.report.option_details"),
             )
+            .name_localized("ko", "상세")
+            .description_localized("ko", t!("commands.report.option_details", locale = "ko"))
             .required(false),
         )
 }
 
 /// /report command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
+    let locale = resolve_locale_async(ctx, interaction).await;
     let options = interaction.data.options();
 
     // Parse incident_type (required)
@@ -104,7 +129,12 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         });
 
     let Some(incident_type) = incident_type else {
-        return respond_error(ctx, interaction, "Missing incident type").await;
+        return respond_error(
+            ctx,
+            interaction,
+            &t!("errors.missing_incident_type", locale = &locale),
+        )
+        .await;
     };
 
     // Parse details (optional)
@@ -126,10 +156,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         return respond_error(
             ctx,
             interaction,
-            &format!(
-                "Details must be under {} characters.\nYou provided {} characters.",
-                MAX_DETAILS_LENGTH,
-                d.len()
+            &t!(
+                "errors.details_too_long",
+                locale = &locale,
+                max = MAX_DETAILS_LENGTH,
+                current = d.len()
             ),
         )
         .await;
@@ -153,12 +184,12 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             return respond_error(
                 ctx,
                 interaction,
-                "An administrator must run `/config setup #channel` first.",
+                &t!("embeds.report.error_guild_not_registered", locale = &locale),
             )
             .await;
         }
         RegistrationStatus::UserNotRegistered => {
-            return respond_user_intro(ctx, interaction).await;
+            return respond_user_intro(ctx, interaction, &locale).await;
         }
     }
 
@@ -170,13 +201,15 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         ReportInsertResult::CooldownActive(last_report_time) => {
             // User is in cooldown - show when they can report again
             let can_report_at = last_report_time + Duration::minutes(DUPLICATE_COOLDOWN_MINUTES);
+            let time_text = format!("<t:{}:R>", can_report_at.timestamp());
             return respond_warning(
                 ctx,
                 interaction,
-                "Report Cooldown",
-                &format!(
-                    "You recently submitted a report.\nYou can report again <t:{}:R>.",
-                    can_report_at.timestamp()
+                &t!("embeds.report.cooldown.title", locale = &locale),
+                &t!(
+                    "embeds.report.cooldown.description",
+                    locale = &locale,
+                    time = time_text
                 ),
             )
             .await;
@@ -186,7 +219,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             return respond_error(
                 ctx,
                 interaction,
-                "Failed to submit report. Please try again.",
+                &t!("embeds.report.error_insert_failed", locale = &locale),
             )
             .await;
         }
@@ -208,31 +241,39 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     );
 
     // Success response
-    let display_name = get_incident_display_name(incident_type);
+    let display_name = get_incident_display_name_localized(incident_type, &locale);
     let others_text = if similar_count == 0 {
-        "You're the first to report this issue recently.".to_string()
+        t!("embeds.report.success.others_none", locale = &locale).to_string()
     } else if similar_count == 1 {
-        format!(
-            "1 other user reported this issue in the last {} minutes.",
-            interval
+        t!(
+            "embeds.report.success.others_one",
+            locale = &locale,
+            interval = interval
         )
+        .to_string()
     } else {
-        format!(
-            "{} others reported this issue in the last {} minutes.",
-            similar_count, interval
+        t!(
+            "embeds.report.success.others_many",
+            locale = &locale,
+            count = similar_count,
+            interval = interval
         )
+        .to_string()
     };
 
     let embed = CreateEmbed::default()
-        .title("Report Submitted")
-        .description(format!(
-            "Thank you for reporting **{}**.\n\n{}",
-            display_name, others_text
+        .title(t!("embeds.report.success.title", locale = &locale))
+        .description(t!(
+            "embeds.report.success.description",
+            locale = &locale,
+            incident_type = display_name,
+            others_text = others_text
         ))
         .color(Colour::new(COLOR_SUCCESS))
-        .footer(CreateEmbedFooter::new(
-            "Your report helps us detect widespread issues.",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.report.success.footer",
+            locale = &locale
+        )))
         .timestamp(Timestamp::now());
 
     let response = CreateInteractionResponseMessage::new().embed(embed);
@@ -502,26 +543,29 @@ async fn respond_warning(
 async fn respond_user_intro(
     ctx: &Context,
     interaction: &CommandInteraction,
+    locale: &str,
 ) -> Result<(), serenity::Error> {
     let embed = CreateEmbed::default()
-        .title("Welcome to VRCPulse!")
-        .description(
-            "VRCPulse monitors VRChat server status and alerts you when issues occur.",
-        )
+        .title(t!("embeds.report.intro.title", locale = locale))
+        .description(t!("embeds.report.intro.description", locale = locale))
         .color(Colour::new(COLOR_BRAND))
         .field(
-            "Getting Started",
-            "1. Run `/config setup` to register for DM alerts\n2. Check current VRChat status with `/status`",
+            t!("embeds.report.intro.field_getting_started", locale = locale),
+            t!(
+                "embeds.report.intro.field_getting_started_value",
+                locale = locale
+            ),
             false,
         )
         .field(
-            "Commands",
-            "- `/config setup` - Register for DM alerts\n- `/config show` - View current settings\n- `/status` - View VRChat status dashboard",
+            t!("embeds.report.intro.field_commands", locale = locale),
+            t!("embeds.report.intro.field_commands_value", locale = locale),
             false,
         )
-        .footer(CreateEmbedFooter::new(
-            "Run /config setup to start receiving alerts and submit reports!",
-        ));
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.report.intro.footer",
+            locale = locale
+        )));
 
     let response = CreateInteractionResponseMessage::new()
         .embed(embed)

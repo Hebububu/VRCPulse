@@ -63,6 +63,7 @@
           "field_status_value": "Active",
           "field_channel": "Channel",
           "field_channel_not_set": "Not set",
+          "field_language": "Language",
           "field_registered": "Registered",
           "footer": "Use /config unregister to disable alerts"
         },
@@ -87,6 +88,7 @@
           "field_status_value": "Active",
           "field_delivery": "Delivery",
           "field_delivery_value": "Direct Messages",
+          "field_language": "Language",
           "field_registered": "Registered",
           "footer": "Use /config unregister to disable alerts"
         },
@@ -128,12 +130,49 @@
       "language": {
         "current": {
           "title": "Language Settings",
-          "description": "Current language: **%{language}**"
+          "description": "Current language for this %{context}: **%{language}**",
+          "field_available": "Available Languages",
+          "field_available_value": "- `en` - English\n- `ko` - 한국어 (Korean)\n- `auto` - Auto-detect (Discord)",
+          "footer": "Use /config language <code> to change"
         },
         "updated": {
           "title": "Language Updated",
-          "description": "Language has been changed to **%{language}**."
+          "description": "Language has been set to **%{language}**."
+        },
+        "names": {
+          "en": "English",
+          "ko": "한국어 (Korean)",
+          "auto": "Auto-detect (Discord)"
         }
+      },
+      "setup": {
+        "error_channel_required": "Please specify a channel for alerts.\nUsage: `/config setup #channel`",
+        "error_update_failed": "Failed to update configuration. Please try again.",
+        "error_registration_failed": "Failed to complete registration. Please try again.",
+        "already_registered": {
+          "title": "Already Registered",
+          "description_guild": "This server is already registered with %{channel}.\n\nUse `/config show` to view settings or `/config unregister` to disable.",
+          "description_user": "You're already registered for DM alerts.\n\nUse `/config show` to view settings or `/config unregister` to disable."
+        },
+        "channel_updated": {
+          "title": "Channel Updated",
+          "description": "Alert channel has been changed to %{channel}."
+        },
+        "success": {
+          "title": "Registration Complete!",
+          "description_guild": "VRCPulse alerts will be sent to %{channel}.\n\n**Commands**\n- `/config show` - View settings\n- `/config unregister` - Disable alerts\n- `/status` - Check VRChat status",
+          "description_user": "VRCPulse alerts will be sent to your DMs.\n\n**Commands**\n- `/config show` - View settings\n- `/config unregister` - Disable alerts\n- `/status` - Check VRChat status"
+        },
+        "error_language_not_registered_guild": "This server isn't registered yet.\nRun `/config setup #channel` first.",
+        "error_language_not_registered_user": "You aren't registered yet.\nRun `/config setup` first.",
+        "error_language_update_failed": "Failed to update language. Please try again."
+      },
+      "errors": {
+        "not_registered": "This server/account isn't registered. Use `/config setup` to register first.",
+        "no_permission": "You don't have permission to unregister this server.",
+        "could_not_verify": "Could not verify your permissions. Please try again.",
+        "only_own_account": "You can only unregister your own account.",
+        "invalid_button_state": "Invalid button state. Please run `/config unregister` again."
       }
     },
 

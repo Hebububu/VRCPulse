@@ -3,13 +3,13 @@
 //! Provides translation support using rust-i18n.
 //!
 //! # Language Resolution Priority
-//! 1. Discord locale (from interaction) - highest priority
-//! 2. Guild preference (from guild_configs.language)
-//! 3. User preference (from user_configs.language)
+//! 1. Guild preference (from guild_configs.language) - if in guild context
+//! 2. User preference (from user_configs.language)
+//! 3. Discord locale (from interaction)
 //! 4. Default: "en"
 
 use sea_orm::{DatabaseConnection, EntityTrait};
-use serenity::all::{CommandInteraction, Context, GuildId, UserId};
+use serenity::all::{CommandInteraction, ComponentInteraction, Context, GuildId, UserId};
 
 use crate::entity::{guild_configs, user_configs};
 use crate::state::AppStateKey;
@@ -50,25 +50,21 @@ pub fn resolve_locale(interaction: &CommandInteraction) -> String {
 /// Resolve the locale for a command interaction (async version with database lookup)
 ///
 /// Priority:
-/// 1. Discord locale (always wins if supported)
-/// 2. Guild preference (fallback for guild context)
-/// 3. User preference (fallback for DM context)
+/// 1. Guild preference (from guild_configs.language) - if in guild context and set
+/// 2. User preference (from user_configs.language) - if set
+/// 3. Discord locale (from interaction)
 /// 4. Default: "en"
 pub async fn resolve_locale_async(ctx: &Context, interaction: &CommandInteraction) -> String {
-    // 1. Check Discord locale first (highest priority)
-    let discord_locale = interaction.locale.as_str();
-    let normalized = normalize_locale(discord_locale);
-    if is_supported(normalized) && normalized != DEFAULT_LOCALE {
-        return normalized.to_string();
-    }
-
     // Get database connection
     let db = match get_db(ctx).await {
         Some(db) => db,
-        None => return normalized.to_string(),
+        None => {
+            // No database, fall back to Discord locale
+            return normalize_locale(interaction.locale.as_str()).to_string();
+        }
     };
 
-    // 2. Check guild preference (if in guild context)
+    // 1. Check guild preference first (if in guild context)
     if let Some(guild_id) = interaction.guild_id {
         if let Some(lang) = get_guild_language(&db, guild_id).await {
             if is_supported(&lang) {
@@ -77,15 +73,66 @@ pub async fn resolve_locale_async(ctx: &Context, interaction: &CommandInteractio
         }
     }
 
-    // 3. Check user preference
+    // 2. Check user preference
     if let Some(lang) = get_user_language(&db, interaction.user.id).await {
         if is_supported(&lang) {
             return lang;
         }
     }
 
-    // 4. Fall back to Discord locale if supported, otherwise default
-    normalized.to_string()
+    // 3. Fall back to Discord locale
+    let discord_locale = interaction.locale.as_str();
+    let normalized = normalize_locale(discord_locale);
+    if is_supported(normalized) {
+        return normalized.to_string();
+    }
+
+    // 4. Default
+    DEFAULT_LOCALE.to_string()
+}
+
+/// Resolve the locale for a component interaction (button, select menu, etc.)
+///
+/// Priority:
+/// 1. Guild preference (from guild_configs.language) - if in guild context
+/// 2. User preference (from user_configs.language)
+/// 3. Discord locale (from interaction)
+/// 4. Default: "en"
+pub async fn resolve_locale_component(ctx: &Context, interaction: &ComponentInteraction) -> String {
+    // Get database connection
+    let db = match get_db(ctx).await {
+        Some(db) => db,
+        None => {
+            // No database, fall back to Discord locale
+            return normalize_locale(&interaction.locale).to_string();
+        }
+    };
+
+    // 1. Check guild preference first (if in guild context)
+    if let Some(guild_id) = interaction.guild_id {
+        if let Some(lang) = get_guild_language(&db, guild_id).await {
+            if is_supported(&lang) {
+                return lang;
+            }
+        }
+    }
+
+    // 2. Check user preference
+    if let Some(lang) = get_user_language(&db, interaction.user.id).await {
+        if is_supported(&lang) {
+            return lang;
+        }
+    }
+
+    // 3. Fall back to Discord locale
+    let discord_locale = &interaction.locale;
+    let normalized = normalize_locale(discord_locale);
+    if is_supported(normalized) {
+        return normalized.to_string();
+    }
+
+    // 4. Default
+    DEFAULT_LOCALE.to_string()
 }
 
 /// Resolve locale for alert sending (guild context)

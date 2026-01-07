@@ -63,6 +63,7 @@
           "field_status_value": "활성",
           "field_channel": "채널",
           "field_channel_not_set": "설정되지 않음",
+          "field_language": "언어",
           "field_registered": "등록일",
           "footer": "/설정 비활성화로 알림을 비활성화할 수 있습니다"
         },
@@ -87,6 +88,7 @@
           "field_status_value": "활성",
           "field_delivery": "전달 방식",
           "field_delivery_value": "다이렉트 메시지",
+          "field_language": "언어",
           "field_registered": "등록일",
           "footer": "/설정 비활성화로 알림을 비활성화할 수 있습니다"
         },
@@ -128,12 +130,49 @@
       "language": {
         "current": {
           "title": "언어 설정",
-          "description": "현재 언어: **%{language}**"
+          "description": "이 %{context}의 현재 언어: **%{language}**",
+          "field_available": "사용 가능한 언어",
+          "field_available_value": "- `en` - English (영어)\n- `ko` - 한국어\n- `auto` - 자동 감지 (Discord)",
+          "footer": "/설정 언어 <코드>로 변경"
         },
         "updated": {
           "title": "언어 변경됨",
-          "description": "언어가 **%{language}**(으)로 변경되었습니다."
+          "description": "언어가 **%{language}**(으)로 설정되었습니다."
+        },
+        "names": {
+          "en": "English (영어)",
+          "ko": "한국어",
+          "auto": "자동 감지 (Discord)"
         }
+      },
+      "setup": {
+        "error_channel_required": "알림을 받을 채널을 지정해주세요.\n사용법: `/설정 등록 #채널`",
+        "error_update_failed": "설정 업데이트에 실패했습니다. 다시 시도해주세요.",
+        "error_registration_failed": "등록에 실패했습니다. 다시 시도해주세요.",
+        "already_registered": {
+          "title": "이미 등록됨",
+          "description_guild": "이 서버는 이미 %{channel}(으)로 등록되어 있습니다.\n\n`/설정 확인`으로 설정을 보거나 `/설정 비활성화`로 비활성화하세요.",
+          "description_user": "이미 DM 알림에 등록되어 있습니다.\n\n`/설정 확인`으로 설정을 보거나 `/설정 비활성화`로 비활성화하세요."
+        },
+        "channel_updated": {
+          "title": "채널 변경됨",
+          "description": "알림 채널이 %{channel}(으)로 변경되었습니다."
+        },
+        "success": {
+          "title": "등록 완료!",
+          "description_guild": "VRCPulse 알림이 %{channel}(으)로 전송됩니다.\n\n**명령어**\n- `/설정 확인` - 설정 보기\n- `/설정 비활성화` - 알림 비활성화\n- `/상태` - VRChat 상태 확인",
+          "description_user": "VRCPulse 알림이 DM으로 전송됩니다.\n\n**명령어**\n- `/설정 확인` - 설정 보기\n- `/설정 비활성화` - 알림 비활성화\n- `/상태` - VRChat 상태 확인"
+        },
+        "error_language_not_registered_guild": "이 서버는 아직 등록되지 않았습니다.\n먼저 `/설정 등록 #채널`을 실행하세요.",
+        "error_language_not_registered_user": "아직 등록되지 않았습니다.\n먼저 `/설정 등록`을 실행하세요.",
+        "error_language_update_failed": "언어 업데이트에 실패했습니다. 다시 시도해주세요."
+      },
+      "errors": {
+        "not_registered": "이 서버/계정은 등록되지 않았습니다. `/설정 등록`으로 먼저 등록하세요.",
+        "no_permission": "이 서버의 등록을 해제할 권한이 없습니다.",
+        "could_not_verify": "권한을 확인할 수 없습니다. 다시 시도해주세요.",
+        "only_own_account": "자신의 계정만 등록 해제할 수 있습니다.",
+        "invalid_button_state": "버튼 상태가 유효하지 않습니다. `/설정 비활성화`를 다시 실행하세요."
       }
     },
 

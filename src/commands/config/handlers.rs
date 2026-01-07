@@ -1,5 +1,6 @@
 //! Handler functions for /config subcommands
 
+use rust_i18n::t;
 use serenity::all::{
     ButtonStyle, ChannelId, CommandInteraction, ComponentInteraction, Context, CreateActionRow,
     CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage,
@@ -8,6 +9,7 @@ use tracing::{error, info};
 
 use crate::commands::shared::{respond_button_error, respond_error, respond_info, respond_success};
 use crate::database;
+use crate::i18n::{resolve_locale_async, resolve_locale_component};
 use crate::repository::{GuildConfigRepository, UserConfigRepository};
 
 use super::context::{ConfigContext, parse_button_context};
@@ -31,6 +33,7 @@ pub async fn handle_setup(
     channel_id: Option<ChannelId>,
 ) -> Result<(), serenity::Error> {
     let db = database::get_db(ctx).await;
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     match config_context {
         ConfigContext::Guild(guild_id) => {
@@ -39,7 +42,10 @@ pub async fn handle_setup(
                 return respond_error(
                     ctx,
                     interaction,
-                    "Please specify a channel for alerts.\nUsage: `/config setup #channel`",
+                    &t!(
+                        "embeds.config.setup.error_channel_required",
+                        locale = &locale
+                    ),
                 )
                 .await;
             };
@@ -58,13 +64,18 @@ pub async fn handle_setup(
             {
                 // Already registered - update channel if different
                 if config.channel_id.as_ref() == Some(&channel_id.to_string()) {
+                    let channel = format!("<#{}>", channel_id);
                     return respond_info(
                         ctx,
                         interaction,
-                        "Already Registered",
-                        &format!(
-                            "This server is already registered with <#{}>.\n\nUse `/config show` to view settings or `/config unregister` to disable.",
-                            channel_id
+                        &t!(
+                            "embeds.config.setup.already_registered.title",
+                            locale = &locale
+                        ),
+                        &t!(
+                            "embeds.config.setup.already_registered.description_guild",
+                            locale = &locale,
+                            channel = channel
                         ),
                     )
                     .await;
@@ -75,15 +86,23 @@ pub async fn handle_setup(
                         return respond_error(
                             ctx,
                             interaction,
-                            "Failed to update configuration. Please try again.",
+                            &t!("embeds.config.setup.error_update_failed", locale = &locale),
                         )
                         .await;
                     }
+                    let channel = format!("<#{}>", channel_id);
                     return respond_success(
                         ctx,
                         interaction,
-                        "Channel Updated",
-                        &format!("Alert channel has been changed to <#{}>.", channel_id),
+                        &t!(
+                            "embeds.config.setup.channel_updated.title",
+                            locale = &locale
+                        ),
+                        &t!(
+                            "embeds.config.setup.channel_updated.description",
+                            locale = &locale,
+                            channel = channel
+                        ),
                     )
                     .await;
                 }
@@ -99,13 +118,15 @@ pub async fn handle_setup(
             match result {
                 Ok(_) => {
                     info!(guild_id = %guild_id, channel_id = %channel_id, "Guild registered for alerts");
+                    let channel = format!("<#{}>", channel_id);
                     respond_success(
                         ctx,
                         interaction,
-                        "Registration Complete!",
-                        &format!(
-                            "VRCPulse alerts will be sent to <#{}>.\n\n**Commands**\n- `/config show` - View settings\n- `/config unregister` - Disable alerts\n- `/status` - Check VRChat status",
-                            channel_id
+                        &t!("embeds.config.setup.success.title", locale = &locale),
+                        &t!(
+                            "embeds.config.setup.success.description_guild",
+                            locale = &locale,
+                            channel = channel
                         ),
                     )
                     .await
@@ -115,7 +136,10 @@ pub async fn handle_setup(
                     respond_error(
                         ctx,
                         interaction,
-                        "Failed to complete registration. Please try again.",
+                        &t!(
+                            "embeds.config.setup.error_registration_failed",
+                            locale = &locale
+                        ),
                     )
                     .await
                 }
@@ -132,8 +156,14 @@ pub async fn handle_setup(
                 return respond_info(
                     ctx,
                     interaction,
-                    "Already Registered",
-                    "You're already registered for DM alerts.\n\nUse `/config show` to view settings or `/config unregister` to disable.",
+                    &t!(
+                        "embeds.config.setup.already_registered.title",
+                        locale = &locale
+                    ),
+                    &t!(
+                        "embeds.config.setup.already_registered.description_user",
+                        locale = &locale
+                    ),
                 )
                 .await;
             }
@@ -151,8 +181,11 @@ pub async fn handle_setup(
                     respond_success(
                         ctx,
                         interaction,
-                        "Registration Complete!",
-                        "VRCPulse alerts will be sent to your DMs.\n\n**Commands**\n- `/config show` - View settings\n- `/config unregister` - Disable alerts\n- `/status` - Check VRChat status",
+                        &t!("embeds.config.setup.success.title", locale = &locale),
+                        &t!(
+                            "embeds.config.setup.success.description_user",
+                            locale = &locale
+                        ),
                     )
                     .await
                 }
@@ -161,7 +194,10 @@ pub async fn handle_setup(
                     respond_error(
                         ctx,
                         interaction,
-                        "Failed to complete registration. Please try again.",
+                        &t!(
+                            "embeds.config.setup.error_registration_failed",
+                            locale = &locale
+                        ),
                     )
                     .await
                 }
@@ -181,22 +217,23 @@ pub async fn handle_show(
     config_context: ConfigContext,
 ) -> Result<(), serenity::Error> {
     let db = database::get_db(ctx).await;
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     let embed = match config_context {
         ConfigContext::Guild(guild_id) => {
             let repo = GuildConfigRepository::new(db);
             match repo.get(guild_id).await {
-                Some(c) if c.enabled => embeds::show_guild_active(&c),
-                Some(c) => embeds::show_guild_disabled(&c),
-                None => embeds::show_guild_intro(),
+                Some(c) if c.enabled => embeds::show_guild_active(&c, &locale),
+                Some(c) => embeds::show_guild_disabled(&c, &locale),
+                None => embeds::show_guild_intro(&locale),
             }
         }
         ConfigContext::User(user_id) => {
             let repo = UserConfigRepository::new(db);
             match repo.get(user_id).await {
-                Some(c) if c.enabled => embeds::show_user_active(&c),
-                Some(c) => embeds::show_user_disabled(&c),
-                None => embeds::show_user_intro(),
+                Some(c) if c.enabled => embeds::show_user_active(&c, &locale),
+                Some(c) => embeds::show_user_disabled(&c, &locale),
+                None => embeds::show_user_intro(&locale),
             }
         }
     };
@@ -218,6 +255,7 @@ pub async fn handle_unregister(
     config_context: ConfigContext,
 ) -> Result<(), serenity::Error> {
     let db = database::get_db(ctx).await;
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     // Check if registered
     let is_registered = match &config_context {
@@ -235,7 +273,7 @@ pub async fn handle_unregister(
         return respond_error(
             ctx,
             interaction,
-            "This server/account isn't registered. Use `/config setup` to register first.",
+            &t!("embeds.config.errors.not_registered", locale = &locale),
         )
         .await;
     }
@@ -250,7 +288,7 @@ pub async fn handle_unregister(
     };
 
     let is_guild = matches!(config_context, ConfigContext::Guild(_));
-    let embed = embeds::unregister_confirm(&name, is_guild);
+    let embed = embeds::unregister_confirm(&name, is_guild, &locale);
 
     // Encode context in button custom_id to preserve it across interaction
     let context_suffix = match &config_context {
@@ -263,13 +301,13 @@ pub async fn handle_unregister(
             "{}{}",
             BUTTON_CANCEL_UNREGISTER_PREFIX, context_suffix
         ))
-        .label("Cancel")
+        .label(t!("buttons.cancel", locale = &locale))
         .style(ButtonStyle::Secondary),
         CreateButton::new(format!(
             "{}{}",
             BUTTON_CONFIRM_UNREGISTER_PREFIX, context_suffix
         ))
-        .label("Yes, Unregister")
+        .label(t!("buttons.yes_unregister", locale = &locale))
         .style(ButtonStyle::Danger),
     ]);
 
@@ -303,6 +341,7 @@ pub async fn handle_unregister_confirm(
     interaction: &ComponentInteraction,
 ) -> Result<(), serenity::Error> {
     let db = database::get_db(ctx).await;
+    let locale = resolve_locale_component(ctx, interaction).await;
 
     // Parse context from button custom_id
     let config_context = parse_button_context(&interaction.data.custom_id);
@@ -317,7 +356,7 @@ pub async fn handle_unregister_confirm(
                     return respond_button_error(
                         ctx,
                         interaction,
-                        "You don't have permission to unregister this server.",
+                        &t!("embeds.config.errors.no_permission", locale = &locale),
                     )
                     .await;
                 }
@@ -331,7 +370,7 @@ pub async fn handle_unregister_confirm(
                     return respond_button_error(
                         ctx,
                         interaction,
-                        "Could not verify your permissions. Please try again.",
+                        &t!("embeds.config.errors.could_not_verify", locale = &locale),
                     )
                     .await;
                 }
@@ -343,7 +382,7 @@ pub async fn handle_unregister_confirm(
                 return respond_button_error(
                     ctx,
                     interaction,
-                    "You can only unregister your own account.",
+                    &t!("embeds.config.errors.only_own_account", locale = &locale),
                 )
                 .await;
             }
@@ -370,17 +409,20 @@ pub async fn handle_unregister_confirm(
             return respond_button_error(
                 ctx,
                 interaction,
-                "Invalid button state. Please run `/config unregister` again.",
+                &t!(
+                    "embeds.config.errors.invalid_button_state",
+                    locale = &locale
+                ),
             )
             .await;
         }
     };
 
     let embed = match result {
-        Ok(()) => embeds::unregister_success(),
+        Ok(()) => embeds::unregister_success(&locale),
         Err(e) => {
             error!(error = %e, "Failed to disable config");
-            embeds::unregister_error()
+            embeds::unregister_error(&locale)
         }
     };
 
@@ -401,8 +443,10 @@ pub async fn handle_unregister_cancel(
     ctx: &Context,
     interaction: &ComponentInteraction,
 ) -> Result<(), serenity::Error> {
+    let locale = resolve_locale_component(ctx, interaction).await;
+
     let response = CreateInteractionResponseMessage::new()
-        .embed(embeds::unregister_cancelled())
+        .embed(embeds::unregister_cancelled(&locale))
         .components(vec![]);
 
     interaction
@@ -425,6 +469,7 @@ pub async fn handle_language(
     language_code: Option<String>,
 ) -> Result<(), serenity::Error> {
     let db = database::get_db(ctx).await;
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     // Check if user provided any argument
     let has_argument = language_code.is_some();
@@ -442,7 +487,10 @@ pub async fn handle_language(
                 return respond_error(
                     ctx,
                     interaction,
-                    "This server isn't registered yet.\nRun `/config setup #channel` first.",
+                    &t!(
+                        "embeds.config.setup.error_language_not_registered_guild",
+                        locale = &locale
+                    ),
                 )
                 .await;
             }
@@ -450,18 +498,19 @@ pub async fn handle_language(
             // If no language specified, show current setting
             if !has_argument {
                 let current = existing.and_then(|c| c.language);
-                let embed = embeds::language_current(current.as_deref(), true);
+                let embed = embeds::language_current(current.as_deref(), true, &locale);
                 let response = CreateInteractionResponseMessage::new().embed(embed);
                 return interaction
                     .create_response(&ctx.http, CreateInteractionResponse::Message(response))
                     .await;
             }
 
-            // Update language
+            // Update language - use the NEW language for the response
+            let response_locale = language.as_deref().unwrap_or(&locale);
             match repo.update_language(guild_id, language.clone()).await {
                 Ok(_) => {
                     info!(guild_id = %guild_id, language = ?language, "Updated guild language");
-                    let embed = embeds::language_updated(language.as_deref());
+                    let embed = embeds::language_updated(language.as_deref(), response_locale);
                     let response = CreateInteractionResponseMessage::new().embed(embed);
                     interaction
                         .create_response(&ctx.http, CreateInteractionResponse::Message(response))
@@ -472,7 +521,10 @@ pub async fn handle_language(
                     respond_error(
                         ctx,
                         interaction,
-                        "Failed to update language. Please try again.",
+                        &t!(
+                            "embeds.config.setup.error_language_update_failed",
+                            locale = &locale
+                        ),
                     )
                     .await
                 }
@@ -487,7 +539,10 @@ pub async fn handle_language(
                 return respond_error(
                     ctx,
                     interaction,
-                    "You aren't registered yet.\nRun `/config setup` first.",
+                    &t!(
+                        "embeds.config.setup.error_language_not_registered_user",
+                        locale = &locale
+                    ),
                 )
                 .await;
             }
@@ -495,18 +550,19 @@ pub async fn handle_language(
             // If no language specified, show current setting
             if !has_argument {
                 let current = existing.and_then(|c| c.language);
-                let embed = embeds::language_current(current.as_deref(), false);
+                let embed = embeds::language_current(current.as_deref(), false, &locale);
                 let response = CreateInteractionResponseMessage::new().embed(embed);
                 return interaction
                     .create_response(&ctx.http, CreateInteractionResponse::Message(response))
                     .await;
             }
 
-            // Update language
+            // Update language - use the NEW language for the response
+            let response_locale = language.as_deref().unwrap_or(&locale);
             match repo.update_language(user_id, language.clone()).await {
                 Ok(_) => {
                     info!(user_id = %user_id, language = ?language, "Updated user language");
-                    let embed = embeds::language_updated(language.as_deref());
+                    let embed = embeds::language_updated(language.as_deref(), response_locale);
                     let response = CreateInteractionResponseMessage::new().embed(embed);
                     interaction
                         .create_response(&ctx.http, CreateInteractionResponse::Message(response))
@@ -517,7 +573,10 @@ pub async fn handle_language(
                     respond_error(
                         ctx,
                         interaction,
-                        "Failed to update language. Please try again.",
+                        &t!(
+                            "embeds.config.setup.error_language_update_failed",
+                            locale = &locale
+                        ),
                     )
                     .await
                 }

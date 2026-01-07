@@ -1,5 +1,6 @@
 //! Embed builders for /config command responses
 
+use rust_i18n::t;
 use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter};
 
 use crate::commands::shared::colors;
@@ -10,70 +11,145 @@ use crate::entity::{guild_configs, user_configs};
 // =============================================================================
 
 /// Build embed for active guild configuration
-pub fn show_guild_active(config: &guild_configs::Model) -> CreateEmbed {
+pub fn show_guild_active(config: &guild_configs::Model, locale: &str) -> CreateEmbed {
     let channel_display = config
         .channel_id
         .as_ref()
         .map(|id| format!("<#{}>", id))
-        .unwrap_or_else(|| "Not set".to_string());
+        .unwrap_or_else(|| {
+            t!(
+                "embeds.config.show.guild_active.field_channel_not_set",
+                locale = locale
+            )
+            .to_string()
+        });
+
+    let language_display = get_language_display_name(config.language.as_deref(), locale);
 
     CreateEmbed::default()
-        .title("VRCPulse Configuration")
+        .title(t!("embeds.config.show.guild_active.title", locale = locale))
         .color(Colour::new(colors::BRAND))
-        .field("Status", "Active", true)
-        .field("Channel", channel_display, true)
         .field(
-            "Registered",
+            t!(
+                "embeds.config.show.guild_active.field_status",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.guild_active.field_status_value",
+                locale = locale
+            ),
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.guild_active.field_channel",
+                locale = locale
+            ),
+            channel_display,
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.guild_active.field_language",
+                locale = locale
+            ),
+            language_display,
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.guild_active.field_registered",
+                locale = locale
+            ),
             format!("<t:{}:R>", config.created_at.timestamp()),
             true,
         )
-        .footer(CreateEmbedFooter::new(
-            "Use /config unregister to disable alerts",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.show.guild_active.footer",
+            locale = locale
+        )))
 }
 
 /// Build embed for disabled guild configuration
-pub fn show_guild_disabled(config: &guild_configs::Model) -> CreateEmbed {
+pub fn show_guild_disabled(config: &guild_configs::Model, locale: &str) -> CreateEmbed {
     let channel_display = config
         .channel_id
         .as_ref()
         .map(|id| format!("<#{}>", id))
-        .unwrap_or_else(|| "Not set".to_string());
+        .unwrap_or_else(|| {
+            t!(
+                "embeds.config.show.guild_active.field_channel_not_set",
+                locale = locale
+            )
+            .to_string()
+        });
+
+    let time = format!("<t:{}:R>", config.updated_at.timestamp());
 
     CreateEmbed::default()
-        .title("VRCPulse - Unregistered")
-        .description(format!(
-            "This server was unregistered <t:{}:R>.\nRun `/config setup #channel` to re-enable alerts.",
-            config.updated_at.timestamp()
+        .title(t!(
+            "embeds.config.show.guild_disabled.title",
+            locale = locale
+        ))
+        .description(t!(
+            "embeds.config.show.guild_disabled.description",
+            locale = locale,
+            time = time
         ))
         .color(Colour::new(colors::WARNING))
-        .field("Previous Channel", channel_display, true)
         .field(
-            "Originally Registered",
+            t!(
+                "embeds.config.show.guild_disabled.field_previous_channel",
+                locale = locale
+            ),
+            channel_display,
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.guild_disabled.field_originally_registered",
+                locale = locale
+            ),
             format!("<t:{}:R>", config.created_at.timestamp()),
             true,
         )
 }
 
 /// Build intro embed for unregistered guild
-pub fn show_guild_intro() -> CreateEmbed {
+pub fn show_guild_intro(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Welcome to VRCPulse!")
-        .description("VRCPulse monitors VRChat server status and alerts you when issues occur.")
+        .title(t!("embeds.config.show.guild_intro.title", locale = locale))
+        .description(t!(
+            "embeds.config.show.guild_intro.description",
+            locale = locale
+        ))
         .color(Colour::new(colors::BRAND))
         .field(
-            "Getting Started",
-            "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",
+            t!(
+                "embeds.config.show.guild_intro.field_getting_started",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.guild_intro.field_getting_started_value",
+                locale = locale
+            ),
             false,
         )
         .field(
-            "Commands",
-            "- `/config setup <channel>` - Register and set alert channel\n- `/config show` - View current settings\n- `/config unregister` - Disable alerts",
+            t!(
+                "embeds.config.show.guild_intro.field_commands",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.guild_intro.field_commands_value",
+                locale = locale
+            ),
             false,
         )
-        .footer(CreateEmbedFooter::new(
-            "This server isn't registered yet. Run /config setup #channel to get started!",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.show.guild_intro.footer",
+            locale = locale
+        )))
 }
 
 // =============================================================================
@@ -81,57 +157,116 @@ pub fn show_guild_intro() -> CreateEmbed {
 // =============================================================================
 
 /// Build embed for active user configuration
-pub fn show_user_active(config: &user_configs::Model) -> CreateEmbed {
+pub fn show_user_active(config: &user_configs::Model, locale: &str) -> CreateEmbed {
+    let language_display = get_language_display_name(config.language.as_deref(), locale);
+
     CreateEmbed::default()
-        .title("VRCPulse Configuration")
+        .title(t!("embeds.config.show.user_active.title", locale = locale))
         .color(Colour::new(colors::BRAND))
-        .field("Status", "Active", true)
-        .field("Delivery", "Direct Messages", true)
         .field(
-            "Registered",
+            t!(
+                "embeds.config.show.user_active.field_status",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.user_active.field_status_value",
+                locale = locale
+            ),
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.user_active.field_delivery",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.user_active.field_delivery_value",
+                locale = locale
+            ),
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.user_active.field_language",
+                locale = locale
+            ),
+            language_display,
+            true,
+        )
+        .field(
+            t!(
+                "embeds.config.show.user_active.field_registered",
+                locale = locale
+            ),
             format!("<t:{}:R>", config.created_at.timestamp()),
             true,
         )
-        .footer(CreateEmbedFooter::new(
-            "Use /config unregister to disable alerts",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.show.user_active.footer",
+            locale = locale
+        )))
 }
 
 /// Build embed for disabled user configuration
-pub fn show_user_disabled(config: &user_configs::Model) -> CreateEmbed {
+pub fn show_user_disabled(config: &user_configs::Model, locale: &str) -> CreateEmbed {
+    let time = format!("<t:{}:R>", config.updated_at.timestamp());
+
     CreateEmbed::default()
-        .title("VRCPulse - Unregistered")
-        .description(format!(
-            "You unregistered <t:{}:R>.\nRun `/config setup` to re-enable DM alerts.",
-            config.updated_at.timestamp()
+        .title(t!(
+            "embeds.config.show.user_disabled.title",
+            locale = locale
+        ))
+        .description(t!(
+            "embeds.config.show.user_disabled.description",
+            locale = locale,
+            time = time
         ))
         .color(Colour::new(colors::WARNING))
         .field(
-            "Originally Registered",
+            t!(
+                "embeds.config.show.user_disabled.field_originally_registered",
+                locale = locale
+            ),
             format!("<t:{}:R>", config.created_at.timestamp()),
             true,
         )
 }
 
 /// Build intro embed for unregistered user
-pub fn show_user_intro() -> CreateEmbed {
+pub fn show_user_intro(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Welcome to VRCPulse!")
-        .description("VRCPulse monitors VRChat server status and alerts you when issues occur.")
+        .title(t!("embeds.config.show.user_intro.title", locale = locale))
+        .description(t!(
+            "embeds.config.show.user_intro.description",
+            locale = locale
+        ))
         .color(Colour::new(colors::BRAND))
         .field(
-            "Getting Started",
-            "1. Run `/config setup` to register for DM alerts\n2. Check current VRChat status with `/status`",
+            t!(
+                "embeds.config.show.user_intro.field_getting_started",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.user_intro.field_getting_started_value",
+                locale = locale
+            ),
             false,
         )
         .field(
-            "Commands",
-            "- `/config setup` - Register for DM alerts\n- `/config show` - View current settings\n- `/config unregister` - Disable alerts",
+            t!(
+                "embeds.config.show.user_intro.field_commands",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.show.user_intro.field_commands_value",
+                locale = locale
+            ),
             false,
         )
-        .footer(CreateEmbedFooter::new(
-            "You aren't registered yet. Run /config setup to get started!",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.show.user_intro.footer",
+            locale = locale
+        )))
 }
 
 // =============================================================================
@@ -139,48 +274,71 @@ pub fn show_user_intro() -> CreateEmbed {
 // =============================================================================
 
 /// Build confirmation embed for unregister action
-pub fn unregister_confirm(name: &str, is_guild: bool) -> CreateEmbed {
+pub fn unregister_confirm(name: &str, is_guild: bool, locale: &str) -> CreateEmbed {
     let description = if is_guild {
-        format!(
-            "Are you sure you want to unregister **{}**?\n\nThis will stop all VRCPulse alerts for this server.",
-            name
+        t!(
+            "embeds.config.unregister.confirm.description_guild",
+            locale = locale,
+            name = name
         )
+        .to_string()
     } else {
-        "Are you sure you want to unregister?\n\nThis will stop all VRCPulse DM alerts.".to_string()
+        t!(
+            "embeds.config.unregister.confirm.description_user",
+            locale = locale
+        )
+        .to_string()
     };
 
     CreateEmbed::default()
-        .title("Confirm Unregister")
+        .title(t!(
+            "embeds.config.unregister.confirm.title",
+            locale = locale
+        ))
         .description(description)
         .color(Colour::new(colors::WARNING))
-        .footer(CreateEmbedFooter::new(
-            "This confirmation expires in 15 minutes",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.unregister.confirm.footer",
+            locale = locale
+        )))
 }
 
 /// Build success embed after unregistering
-pub fn unregister_success() -> CreateEmbed {
+pub fn unregister_success(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Unregistered")
-        .description(
-            "VRCPulse alerts have been disabled.\n\nYou can re-register anytime with `/config setup`.",
-        )
+        .title(t!(
+            "embeds.config.unregister.success.title",
+            locale = locale
+        ))
+        .description(t!(
+            "embeds.config.unregister.success.description",
+            locale = locale
+        ))
         .color(Colour::new(colors::SUCCESS))
 }
 
 /// Build cancelled embed for unregister action
-pub fn unregister_cancelled() -> CreateEmbed {
+pub fn unregister_cancelled(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Cancelled")
-        .description("Unregister cancelled. Your configuration remains active.")
+        .title(t!(
+            "embeds.config.unregister.cancelled.title",
+            locale = locale
+        ))
+        .description(t!(
+            "embeds.config.unregister.cancelled.description",
+            locale = locale
+        ))
         .color(Colour::new(colors::BRAND))
 }
 
 /// Build error embed for failed unregister
-pub fn unregister_error() -> CreateEmbed {
+pub fn unregister_error(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Error")
-        .description("Failed to unregister. Please try again.")
+        .title(t!("embeds.config.unregister.error.title", locale = locale))
+        .description(t!(
+            "embeds.config.unregister.error.description",
+            locale = locale
+        ))
         .color(Colour::new(colors::ERROR))
 }
 
@@ -188,44 +346,57 @@ pub fn unregister_error() -> CreateEmbed {
 // Language Handler Embeds
 // =============================================================================
 
-/// Get display name for language code
-fn get_language_display_name(code: Option<&str>) -> &str {
+/// Get display name for language code using i18n
+fn get_language_display_name(code: Option<&str>, locale: &str) -> String {
     match code {
-        Some("en") => "English",
-        Some("ko") => "한국어 (Korean)",
-        None => "Auto-detect (Discord)",
-        Some(other) => other,
+        Some("en") => t!("embeds.config.language.names.en", locale = locale).to_string(),
+        Some("ko") => t!("embeds.config.language.names.ko", locale = locale).to_string(),
+        None => t!("embeds.config.language.names.auto", locale = locale).to_string(),
+        Some(other) => other.to_string(),
     }
 }
 
 /// Build embed showing current language setting
-pub fn language_current(current: Option<&str>, is_guild: bool) -> CreateEmbed {
-    let display_name = get_language_display_name(current);
+pub fn language_current(current: Option<&str>, is_guild: bool, locale: &str) -> CreateEmbed {
+    let display_name = get_language_display_name(current, locale);
     let context = if is_guild { "server" } else { "account" };
 
     CreateEmbed::default()
-        .title("Language Settings")
-        .description(format!(
-            "Current language for this {}: **{}**",
-            context, display_name
+        .title(t!("embeds.config.language.current.title", locale = locale))
+        .description(t!(
+            "embeds.config.language.current.description",
+            locale = locale,
+            context = context,
+            language = display_name
         ))
         .color(Colour::new(colors::BRAND))
         .field(
-            "Available Languages",
-            "- `en` - English\n- `ko` - 한국어 (Korean)\n- `auto` - Auto-detect (Discord)",
+            t!(
+                "embeds.config.language.current.field_available",
+                locale = locale
+            ),
+            t!(
+                "embeds.config.language.current.field_available_value",
+                locale = locale
+            ),
             false,
         )
-        .footer(CreateEmbedFooter::new(
-            "Use /config language <code> to change",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.config.language.current.footer",
+            locale = locale
+        )))
 }
 
 /// Build embed confirming language update
-pub fn language_updated(language: Option<&str>) -> CreateEmbed {
-    let display_name = get_language_display_name(language);
+pub fn language_updated(language: Option<&str>, locale: &str) -> CreateEmbed {
+    let display_name = get_language_display_name(language, locale);
 
     CreateEmbed::default()
-        .title("Language Updated")
-        .description(format!("Language has been set to **{}**.", display_name))
+        .title(t!("embeds.config.language.updated.title", locale = locale))
+        .description(t!(
+            "embeds.config.language.updated.description",
+            locale = locale,
+            language = display_name
+        ))
         .color(Colour::new(colors::SUCCESS))
 }

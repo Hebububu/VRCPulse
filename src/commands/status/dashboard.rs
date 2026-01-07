@@ -1,5 +1,6 @@
 //! /status dashboard command
 
+use rust_i18n::t;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serenity::all::{
     Colour, CommandInteraction, Context, CreateAttachment, CreateCommand, CreateEmbed,
@@ -8,19 +9,24 @@ use serenity::all::{
 use tracing::error;
 
 use crate::entity::{component_logs, status_logs};
+use crate::i18n::resolve_locale_async;
 use crate::state::AppStateKey;
 use crate::visualization::generate_dashboard;
 
 /// /status command definition
 pub fn register() -> CreateCommand {
     CreateCommand::new("status")
-        .description("View VRChat status dashboard with metrics visualization")
+        .description(t!("commands.status.description"))
+        .name_localized("ko", t!("commands.status.name", locale = "ko"))
+        .description_localized("ko", t!("commands.status.description", locale = "ko"))
 }
 
 /// /status command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
     // Defer response since dashboard generation takes time
     interaction.defer(&ctx.http).await?;
+
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     // Get database from AppState
     let data = ctx.data.read().await;
@@ -74,11 +80,15 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
                     };
                     (emoji, s.description.clone(), color)
                 }
-                None => ("⚪", "Unknown".to_string(), 0x00b0f4),
+                None => (
+                    "⚪",
+                    t!("status.unknown", locale = &locale).to_string(),
+                    0x00b0f4,
+                ),
             };
 
             // Format component statuses
-            let component_fields = format_component_groups(&latest_components);
+            let component_fields = format_component_groups(&latest_components, &locale);
 
             // Format stats for embed
             let online_users = if stats.online_users_avg >= 1000.0 {
@@ -95,27 +105,35 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             };
 
             let mut embed = CreateEmbed::default()
-                .title("VRChat Status Dashboard")
+                .title(t!("embeds.dashboard.title", locale = &locale))
                 .color(Colour::new(embed_color))
                 .image("attachment://dashboard.png")
                 .field(
-                    "System Status",
+                    t!("embeds.dashboard.system_status", locale = &locale),
                     format!("{} {}", status_emoji, status_text),
                     false,
                 )
-                .field("Online Users", &online_users, true)
                 .field(
-                    "API Error Rate",
+                    t!("embeds.dashboard.online_users", locale = &locale),
+                    &online_users,
+                    true,
+                )
+                .field(
+                    t!("embeds.dashboard.api_error_rate", locale = &locale),
                     format!("{:.4}%", stats.api_error_rate_avg),
                     true,
                 )
                 .field("\u{200B}", "\u{200B}", true)
                 .field(
-                    "Steam Auth",
+                    t!("embeds.dashboard.steam_auth", locale = &locale),
                     format!("{:.1}%", stats.steam_success_avg),
                     true,
                 )
-                .field("Meta Auth", format!("{:.1}%", stats.meta_success_avg), true)
+                .field(
+                    t!("embeds.dashboard.meta_auth", locale = &locale),
+                    format!("{:.1}%", stats.meta_success_avg),
+                    true,
+                )
                 .field("\u{200B}", "\u{200B}", true);
 
             // Add component group fields
@@ -124,7 +142,10 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             }
 
             let embed = embed
-                .footer(CreateEmbedFooter::new("Last 12 hours"))
+                .footer(CreateEmbedFooter::new(t!(
+                    "embeds.dashboard.footer_timeframe",
+                    locale = &locale
+                )))
                 .timestamp(Timestamp::now());
 
             let attachment = CreateAttachment::bytes(png_bytes, "dashboard.png");
@@ -139,8 +160,8 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             error!(error = %e, "Failed to generate dashboard");
 
             let embed = CreateEmbed::default()
-                .title("Error")
-                .description("Failed to generate dashboard. Please try again later.")
+                .title(t!("embeds.dashboard.error_title", locale = &locale))
+                .description(t!("embeds.dashboard.error_description", locale = &locale))
                 .color(Colour::new(0xed4245));
 
             let response = serenity::builder::EditInteractionResponse::new().embed(embed);
@@ -172,11 +193,14 @@ const REALTIME_NETWORKING_CHILDREN: &[&str] = &[
 ];
 
 /// Format component statuses into grouped embed fields
-fn format_component_groups(components: &[component_logs::Model]) -> Vec<(String, String, bool)> {
+fn format_component_groups(
+    components: &[component_logs::Model],
+    locale: &str,
+) -> Vec<(String, String, bool)> {
     if components.is_empty() {
         return vec![(
-            "Components".to_string(),
-            "No data available".to_string(),
+            t!("embeds.dashboard.components", locale = locale).to_string(),
+            t!("embeds.dashboard.no_data", locale = locale).to_string(),
             false,
         )];
     }
@@ -203,11 +227,26 @@ fn format_component_groups(components: &[component_logs::Model]) -> Vec<(String,
         }
     };
 
+    // Translate component name
+    let translate_component = |name: &str| -> String {
+        // Try to get localized name, fall back to original
+        let key = format!("components.{}", name);
+        let translated = t!(&key, locale = locale);
+        // If translation key doesn't exist, rust-i18n returns the key itself
+        if translated.contains("components.") {
+            name.to_string()
+        } else {
+            translated.to_string()
+        }
+    };
+
     let format_group = |children: &[&str]| -> String {
         children
             .iter()
             .filter_map(|id| component_map.get(id))
-            .map(|(name, status)| format!("{} {}", format_status(status), name))
+            .map(|(name, status)| {
+                format!("{} {}", format_status(status), translate_component(name))
+            })
             .collect::<Vec<_>>()
             .join("\n")
     };
@@ -224,12 +263,23 @@ fn format_component_groups(components: &[component_logs::Model]) -> Vec<(String,
 
     vec![
         (
-            format!("{} API / Website", api_status),
+            format!(
+                "{} {}",
+                api_status,
+                t!("embeds.dashboard.group_api_website", locale = locale)
+            ),
             format_group(API_WEBSITE_CHILDREN),
             false,
         ),
         (
-            format!("{} Realtime Networking", network_status),
+            format!(
+                "{} {}",
+                network_status,
+                t!(
+                    "embeds.dashboard.group_realtime_networking",
+                    locale = locale
+                )
+            ),
             format_group(REALTIME_NETWORKING_CHILDREN),
             false,
         ),
