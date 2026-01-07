@@ -2,6 +2,7 @@ pub mod admin;
 pub mod config;
 pub mod hello;
 pub mod report;
+pub mod shared;
 pub mod status;
 
 use serenity::all::{Command, Context, CreateCommand};

@@ -120,19 +120,19 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         });
 
     // Validate details length
-    if let Some(ref d) = details {
-        if d.len() > MAX_DETAILS_LENGTH {
-            return respond_error(
-                ctx,
-                interaction,
-                &format!(
-                    "Details must be under {} characters.\nYou provided {} characters.",
-                    MAX_DETAILS_LENGTH,
-                    d.len()
-                ),
-            )
-            .await;
-        }
+    if let Some(ref d) = details
+        && d.len() > MAX_DETAILS_LENGTH
+    {
+        return respond_error(
+            ctx,
+            interaction,
+            &format!(
+                "Details must be under {} characters.\nYou provided {} characters.",
+                MAX_DETAILS_LENGTH,
+                d.len()
+            ),
+        )
+        .await;
     }
 
     // Get database

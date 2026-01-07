@@ -2,9 +2,11 @@ mod alerts;
 mod collector;
 mod commands;
 mod config;
+mod database;
 mod entity;
 mod error;
 mod logging;
+mod repository;
 mod state;
 mod visualization;
 
@@ -17,6 +19,8 @@ use serenity::all::{
     CreateMessage, EventHandler, GatewayIntents, Guild, Interaction, Ready,
 };
 use state::{AppState, AppStateKey};
+
+use crate::commands::shared::colors;
 
 use crate::entity::command_logs;
 use std::sync::Arc;
@@ -71,10 +75,10 @@ impl EventHandler for Handler {
             }
             Interaction::Component(component) => {
                 // Handle button interactions for /config unregister
-                if component.data.custom_id.starts_with("config_") {
-                    if let Err(e) = commands::config::handle_button(&ctx, &component).await {
-                        error!("Button interaction error: {:?}", e);
-                    }
+                if component.data.custom_id.starts_with("config_")
+                    && let Err(e) = commands::config::handle_button(&ctx, &component).await
+                {
+                    error!("Button interaction error: {:?}", e);
                 }
             }
             _ => {}
@@ -144,11 +148,7 @@ async fn log_command(ctx: &serenity::all::Context, command: &CommandInteraction)
     );
 
     // Database audit log
-    let data = ctx.data.read().await;
-    if let Some(state) = data.get::<AppStateKey>() {
-        let state = state.read().await;
-        let db = state.database.as_ref();
-
+    if let Some(db) = database::try_get_db(ctx).await {
         let log = command_logs::ActiveModel {
             command_name: Set(command_name.clone()),
             subcommand: Set(subcommand.map(|s| s.to_string())),
@@ -159,7 +159,7 @@ async fn log_command(ctx: &serenity::all::Context, command: &CommandInteraction)
             ..Default::default()
         };
 
-        if let Err(e) = log.insert(db).await {
+        if let Err(e) = log.insert(&*db).await {
             error!(error = %e, "Failed to insert command log");
         }
     }
@@ -172,7 +172,7 @@ fn create_intro_embed() -> CreateEmbed {
         .description(
             "VRCPulse monitors VRChat server status and alerts you when issues occur.",
         )
-        .color(Colour::new(0x00b0f4))
+        .color(Colour::new(colors::BRAND))
         .field(
             "Getting Started",
             "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",

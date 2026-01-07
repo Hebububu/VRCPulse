@@ -144,19 +144,19 @@ async fn handle_set<'a>(
 ) -> Result<(), serenity::Error> {
     // Parse options
     let poller_str = options.iter().find_map(|opt| {
-        if opt.name == "poller" {
-            if let ResolvedValue::String(s) = opt.value {
-                return Some(s);
-            }
+        if opt.name == "poller"
+            && let ResolvedValue::String(s) = opt.value
+        {
+            return Some(s);
         }
         None
     });
 
     let seconds = options.iter().find_map(|opt| {
-        if opt.name == "seconds" {
-            if let ResolvedValue::Integer(i) = opt.value {
-                return Some(i as u64);
-            }
+        if opt.name == "seconds"
+            && let ResolvedValue::Integer(i) = opt.value
+        {
+            return Some(i as u64);
         }
         None
     });

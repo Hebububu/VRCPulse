@@ -54,10 +54,10 @@ async fn poll_metric(
         };
 
         // Skip if we already have this data point
-        if let Some(latest) = latest_timestamp {
-            if dt <= latest {
-                continue;
-            }
+        if let Some(latest) = latest_timestamp
+            && dt <= latest
+        {
+            continue;
         }
 
         let active = metric_logs::ActiveModel {

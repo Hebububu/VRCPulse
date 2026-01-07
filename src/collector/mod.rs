@@ -12,7 +12,7 @@ use reqwest::Client;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch;
 use tokio::time::{Interval, MissedTickBehavior, interval};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 pub use config::{CollectorConfigRx, CollectorConfigTx};
 
