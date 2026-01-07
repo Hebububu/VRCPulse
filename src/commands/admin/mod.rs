@@ -1,4 +1,5 @@
 pub mod config;
+mod embeds;
 
 use serenity::all::CreateCommand;
 

@@ -43,13 +43,30 @@ impl EventHandler for Handler {
         ctx.set_activity(Some(ActivityData::watching("VRChat Status")));
 
         // Register slash commands
-        let result = match self.test_guild_id {
-            Some(guild_id) => commands::register_guild(&ctx, guild_id).await,
-            None => commands::register_global(&ctx).await,
-        };
+        match self.test_guild_id {
+            Some(guild_id) => {
+                // Development: register all commands including admin to test guild
+                let guild_id = serenity::all::GuildId::new(guild_id);
+                let mut cmds = commands::all();
+                cmds.extend(commands::admin::all());
 
-        if let Err(e) = result {
-            error!("Failed to register commands: {:?}", e);
+                match guild_id.set_commands(&ctx.http, cmds).await {
+                    Ok(registered) => {
+                        info!(
+                            "Registered {} commands to test guild {} (includes admin)",
+                            registered.len(),
+                            guild_id
+                        );
+                    }
+                    Err(e) => error!("Failed to register commands: {:?}", e),
+                }
+            }
+            None => {
+                // Production: global commands only (no admin)
+                if let Err(e) = commands::register_global(&ctx).await {
+                    error!("Failed to register commands: {:?}", e);
+                }
+            }
         }
     }
 
@@ -62,7 +79,7 @@ impl EventHandler for Handler {
 
                 let result = match command.data.name.as_str() {
                     "hello" => commands::hello::run(&ctx, &command).await,
-                    // "admin" => commands::admin::config::run(&ctx, &command).await,
+                    "admin" => commands::admin::config::run(&ctx, &command).await,
                     "config" => commands::config::run(&ctx, &command).await,
                     "report" => commands::report::run(&ctx, &command).await,
                     "status" => commands::status::run(&ctx, &command).await,
