@@ -33,12 +33,12 @@ It monitors VRChat server status and provides real-time visualized dashboards.
 - **📝 User-Driven Reports**: `/report` command with 5-min cooldown and incident type selection
 - **📢 Threshold Alerts**: Automatic alerts when report count exceeds threshold (15-min deduplication)
 - **⚙️ Flexible Configuration**: `/config` command for guild channels and user DM alerts
+- **🌐 Multi-Language Support**: English and Korean with `/config language` command
 
 ## 🚧 Roadmap
 
 - **⏰ Scheduled Status Alerts**: User-configured intervals for automatic server status notifications
 - **📈 Automatic Metric Alerts**: Detect steep rises in server error rates and send proactive alerts
-- **🇰🇷 Korean Language Support**: Localized bot responses and settings for Korean users
 
 ## 🛠 Tech Stack
 
@@ -80,15 +80,15 @@ cargo run
 
 - **시각화 대시보드**: 서버 메트릭을 실시간 그래프로 생성합니다
 - **자동 모니터링**: VRChat Status API 및 CloudFront 메트릭을 주기적으로 수집합니다
-- **사용자 리포트**: `/report` 명령어로 문제 신고 (5분 쿨다운, 문제 유형 선택)
+- **사용자 리포트**: `/신고` 명령어로 문제 신고 (5분 쿨다운, 문제 유형 선택)
 - **임계값 알림**: 신고 수가 임계값을 초과하면 자동 알림 발송 (15분 중복 방지)
-- **유연한 설정**: `/config` 명령어로 서버 채널 및 사용자 DM 알림 설정
+- **유연한 설정**: `/설정` 명령어로 서버 채널 및 사용자 DM 알림 설정
+- **다국어 지원**: `/설정 언어` 명령어로 한국어/영어 선택 가능
 
 ### 개발 예정
 
 - **예약 상태 알림**: 사용자가 지정한 시간마다 자동으로 서버 상태 알림 발송
 - **자동 메트릭 알림**: 서버 에러율 급상승 감지 시 사전 알림 발송
-- **한국어 설정 지원**: 한국어 사용자를 위한 봇 응답 및 설정 로컬라이제이션
 
 ### 시작하기
 
