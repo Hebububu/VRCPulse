@@ -1,5 +1,6 @@
 //! Shared utilities for Discord command responses
 
+use rust_i18n::t;
 use serenity::all::{
     Colour, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseMessage, Timestamp,
@@ -67,9 +68,11 @@ pub async fn respond_error(
     ctx: &Context,
     interaction: &CommandInteraction,
     message: &str,
+    locale: &str,
 ) -> Result<(), serenity::Error> {
+    let title = t!("embeds.dashboard.error_title", locale = locale);
     let embed = CreateEmbed::default()
-        .title("Error")
+        .title(title)
         .description(message)
         .color(Colour::new(colors::ERROR));
 
@@ -91,9 +94,11 @@ pub async fn respond_button_error(
     ctx: &Context,
     interaction: &ComponentInteraction,
     message: &str,
+    locale: &str,
 ) -> Result<(), serenity::Error> {
+    let title = t!("embeds.dashboard.error_title", locale = locale);
     let embed = CreateEmbed::default()
-        .title("Error")
+        .title(title)
         .description(message)
         .color(Colour::new(colors::ERROR));
 

@@ -46,13 +46,14 @@ pub async fn handle_setup(
                         "embeds.config.setup.error_channel_required",
                         locale = &locale
                     ),
+                    &locale,
                 )
                 .await;
             };
 
             // Validate channel permissions
             if let Err(msg) = validate_channel_permissions(ctx, channel_id).await {
-                return respond_error(ctx, interaction, &msg).await;
+                return respond_error(ctx, interaction, &msg, &locale).await;
             }
 
             let repo = GuildConfigRepository::new(db);
@@ -87,6 +88,7 @@ pub async fn handle_setup(
                             ctx,
                             interaction,
                             &t!("embeds.config.setup.error_update_failed", locale = &locale),
+                            &locale,
                         )
                         .await;
                     }
@@ -140,6 +142,7 @@ pub async fn handle_setup(
                             "embeds.config.setup.error_registration_failed",
                             locale = &locale
                         ),
+                        &locale,
                     )
                     .await
                 }
@@ -198,6 +201,7 @@ pub async fn handle_setup(
                             "embeds.config.setup.error_registration_failed",
                             locale = &locale
                         ),
+                        &locale,
                     )
                     .await
                 }
@@ -274,6 +278,7 @@ pub async fn handle_unregister(
             ctx,
             interaction,
             &t!("embeds.config.errors.not_registered", locale = &locale),
+            &locale,
         )
         .await;
     }
@@ -357,6 +362,7 @@ pub async fn handle_unregister_confirm(
                         ctx,
                         interaction,
                         &t!("embeds.config.errors.no_permission", locale = &locale),
+                        &locale,
                     )
                     .await;
                 }
@@ -371,6 +377,7 @@ pub async fn handle_unregister_confirm(
                         ctx,
                         interaction,
                         &t!("embeds.config.errors.could_not_verify", locale = &locale),
+                        &locale,
                     )
                     .await;
                 }
@@ -383,6 +390,7 @@ pub async fn handle_unregister_confirm(
                     ctx,
                     interaction,
                     &t!("embeds.config.errors.only_own_account", locale = &locale),
+                    &locale,
                 )
                 .await;
             }
@@ -413,6 +421,7 @@ pub async fn handle_unregister_confirm(
                     "embeds.config.errors.invalid_button_state",
                     locale = &locale
                 ),
+                &locale,
             )
             .await;
         }
@@ -491,6 +500,7 @@ pub async fn handle_language(
                         "embeds.config.setup.error_language_not_registered_guild",
                         locale = &locale
                     ),
+                    &locale,
                 )
                 .await;
             }
@@ -525,6 +535,7 @@ pub async fn handle_language(
                             "embeds.config.setup.error_language_update_failed",
                             locale = &locale
                         ),
+                        &locale,
                     )
                     .await
                 }
@@ -543,6 +554,7 @@ pub async fn handle_language(
                         "embeds.config.setup.error_language_not_registered_user",
                         locale = &locale
                     ),
+                    &locale,
                 )
                 .await;
             }
@@ -577,6 +589,7 @@ pub async fn handle_language(
                             "embeds.config.setup.error_language_update_failed",
                             locale = &locale
                         ),
+                        &locale,
                     )
                     .await
                 }

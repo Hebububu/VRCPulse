@@ -133,6 +133,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             ctx,
             interaction,
             &t!("errors.missing_incident_type", locale = &locale),
+            &locale,
         )
         .await;
     };
@@ -162,6 +163,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
                 max = MAX_DETAILS_LENGTH,
                 current = d.len()
             ),
+            &locale,
         )
         .await;
     }
@@ -185,6 +187,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
                 ctx,
                 interaction,
                 &t!("embeds.report.error_guild_not_registered", locale = &locale),
+                &locale,
             )
             .await;
         }
@@ -220,6 +223,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
                 ctx,
                 interaction,
                 &t!("embeds.report.error_insert_failed", locale = &locale),
+                &locale,
             )
             .await;
         }
@@ -505,9 +509,10 @@ async fn respond_error(
     ctx: &Context,
     interaction: &CommandInteraction,
     message: &str,
+    locale: &str,
 ) -> Result<(), serenity::Error> {
     let embed = CreateEmbed::default()
-        .title("Error")
+        .title(t!("embeds.dashboard.error_title", locale = locale))
         .description(message)
         .color(Colour::new(COLOR_ERROR));
 

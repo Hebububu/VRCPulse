@@ -17,6 +17,7 @@ rust_i18n::i18n!("locales");
 use chrono::Utc;
 use config::Config;
 use error::Result;
+use rust_i18n::t;
 use sea_orm::{ActiveModelTrait, ConnectOptions, ConnectionTrait, Database, Set};
 use serenity::all::{
     ActivityData, Client, Colour, CommandInteraction, CreateEmbed, CreateEmbedFooter,
@@ -25,6 +26,7 @@ use serenity::all::{
 use state::{AppState, AppStateKey};
 
 use crate::commands::shared::colors;
+use crate::i18n::normalize_locale;
 
 use crate::entity::command_logs;
 use std::sync::Arc;
@@ -116,9 +118,12 @@ impl EventHandler for Handler {
 
         info!(guild_id = %guild.id, guild_name = %guild.name, "Joined new guild");
 
+        // Resolve locale from guild's preferred locale (Discord server setting)
+        let locale = normalize_locale(&guild.preferred_locale);
+
         // Try to send intro message to system channel
         if let Some(system_channel_id) = guild.system_channel_id {
-            let embed = create_intro_embed();
+            let embed = create_intro_embed(locale);
             let message = CreateMessage::new().embed(embed);
 
             if let Err(e) = system_channel_id.send_message(&ctx.http, message).await {
@@ -187,26 +192,34 @@ async fn log_command(ctx: &serenity::all::Context, command: &CommandInteraction)
 }
 
 /// Create the introduction embed for new guilds
-fn create_intro_embed() -> CreateEmbed {
+fn create_intro_embed(locale: &str) -> CreateEmbed {
     CreateEmbed::default()
-        .title("Welcome to VRCPulse!")
-        .description(
-            "VRCPulse monitors VRChat server status and alerts you when issues occur.",
-        )
+        .title(t!("embeds.intro.guild_join.title", locale = locale))
+        .description(t!("embeds.intro.guild_join.description", locale = locale))
         .color(Colour::new(colors::BRAND))
         .field(
-            "Getting Started",
-            "1. Run `/config setup #channel` to register this server\n2. Check current VRChat status with `/status`",
+            t!(
+                "embeds.intro.guild_join.field_getting_started",
+                locale = locale
+            ),
+            t!(
+                "embeds.intro.guild_join.field_getting_started_value",
+                locale = locale
+            ),
             false,
         )
         .field(
-            "Commands",
-            "- `/config setup <channel>` - Register and set alert channel\n- `/config show` - View current settings\n- `/status` - View VRChat status dashboard",
+            t!("embeds.intro.guild_join.field_commands", locale = locale),
+            t!(
+                "embeds.intro.guild_join.field_commands_value",
+                locale = locale
+            ),
             false,
         )
-        .footer(CreateEmbedFooter::new(
-            "Thank you for adding VRCPulse to your server!",
-        ))
+        .footer(CreateEmbedFooter::new(t!(
+            "embeds.intro.guild_join.footer",
+            locale = locale
+        )))
 }
 
 #[tokio::main]

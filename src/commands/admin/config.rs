@@ -100,18 +100,19 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         "show" => handle_admin_show(ctx, interaction).await,
         "config" => {
             let ResolvedValue::SubCommandGroup(subcommands) = &first_opt.value else {
-                return respond_error(ctx, interaction, "Invalid command structure").await;
+                return respond_error(ctx, interaction, "Invalid command structure", "en").await;
             };
 
             let Some(subcommand) = subcommands.first() else {
-                return respond_error(ctx, interaction, "Missing subcommand").await;
+                return respond_error(ctx, interaction, "Missing subcommand", "en").await;
             };
 
             match subcommand.name {
                 "show" => handle_config_show(ctx, interaction, &db).await,
                 "set" => {
                     let ResolvedValue::SubCommand(options) = &subcommand.value else {
-                        return respond_error(ctx, interaction, "Invalid command structure").await;
+                        return respond_error(ctx, interaction, "Invalid command structure", "en")
+                            .await;
                     };
                     handle_config_set(ctx, interaction, &db, options).await
                 }
@@ -277,22 +278,22 @@ async fn handle_config_set<'a>(
     });
 
     let (Some(poller_str), Some(seconds)) = (poller_str, seconds) else {
-        return respond_error(ctx, interaction, "Missing required options").await;
+        return respond_error(ctx, interaction, "Missing required options", "en").await;
     };
 
     let Some(poller) = PollerType::from_str(poller_str) else {
-        return respond_error(ctx, interaction, "Invalid poller type").await;
+        return respond_error(ctx, interaction, "Invalid poller type", "en").await;
     };
 
     // Validate interval
     if let Err(msg) = validate_interval(seconds) {
-        return respond_error(ctx, interaction, &msg).await;
+        return respond_error(ctx, interaction, &msg, "en").await;
     }
 
     // Update interval in database
     if let Err(e) = crate::collector::config::set_interval(db, poller, seconds).await {
         error!(error = %e, "Failed to update polling interval");
-        return respond_error(ctx, interaction, "Failed to save configuration").await;
+        return respond_error(ctx, interaction, "Failed to save configuration", "en").await;
     }
 
     let embed = embeds::config_updated(poller.as_str(), seconds);
@@ -314,7 +315,7 @@ async fn handle_config_reset(
         if let Err(e) = crate::collector::config::set_interval(db, *poller, DEFAULT_INTERVAL).await
         {
             error!(error = %e, poller = ?poller, "Failed to reset polling interval");
-            return respond_error(ctx, interaction, "Failed to reset configuration").await;
+            return respond_error(ctx, interaction, "Failed to reset configuration", "en").await;
         }
     }
 

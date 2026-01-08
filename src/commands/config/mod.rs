@@ -12,6 +12,7 @@ use serenity::all::{
 };
 
 use crate::commands::shared::respond_error;
+use crate::i18n::resolve_locale_async;
 use context::determine_context;
 use handlers::{
     handle_language, handle_setup, handle_show, handle_unregister, handle_unregister_cancel,
@@ -110,9 +111,10 @@ pub fn register() -> CreateCommand {
 /// /config command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
     let options = &interaction.data.options();
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     let Some(subcommand) = options.first() else {
-        return respond_error(ctx, interaction, "Missing subcommand").await;
+        return respond_error(ctx, interaction, "Missing subcommand", &locale).await;
     };
 
     // Determine context: guild or user install
@@ -151,7 +153,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             };
             handle_language(ctx, interaction, config_context, language_code).await
         }
-        _ => respond_error(ctx, interaction, "Unknown subcommand").await,
+        _ => respond_error(ctx, interaction, "Unknown subcommand", &locale).await,
     }
 }
 

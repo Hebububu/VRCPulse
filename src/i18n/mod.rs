@@ -155,6 +155,28 @@ pub async fn resolve_user_locale(db: &DatabaseConnection, user_id: UserId) -> St
     DEFAULT_LOCALE.to_string()
 }
 
+/// Resolve locale for alert sending (guild context, string ID)
+///
+/// Convenience function that accepts a string ID instead of GuildId.
+/// Falls back to default locale on parse error.
+pub async fn resolve_guild_locale_by_id(db: &DatabaseConnection, guild_id: &str) -> String {
+    match guild_id.parse::<u64>() {
+        Ok(id) => resolve_guild_locale(db, GuildId::new(id)).await,
+        Err(_) => DEFAULT_LOCALE.to_string(),
+    }
+}
+
+/// Resolve locale for alert sending (user DM context, string ID)
+///
+/// Convenience function that accepts a string ID instead of UserId.
+/// Falls back to default locale on parse error.
+pub async fn resolve_user_locale_by_id(db: &DatabaseConnection, user_id: &str) -> String {
+    match user_id.parse::<u64>() {
+        Ok(id) => resolve_user_locale(db, UserId::new(id)).await,
+        Err(_) => DEFAULT_LOCALE.to_string(),
+    }
+}
+
 // =============================================================================
 // Database Helpers
 // =============================================================================
@@ -203,5 +225,34 @@ mod tests {
         assert_eq!(normalize_locale("ko"), "ko");
         assert_eq!(normalize_locale("ja"), "en"); // unsupported -> default
         assert_eq!(normalize_locale("fr-FR"), "en"); // unsupported -> default
+    }
+
+    #[test]
+    fn test_critical_translation_keys_exist() {
+        use rust_i18n::t;
+
+        let critical_keys = [
+            "embeds.dashboard.title",
+            "embeds.alerts.threshold.title",
+            "embeds.intro.guild_join.title",
+            "errors.generic",
+            "time.just_now",
+            "time.min_ago_one",
+            "incident_types.login",
+        ];
+
+        for locale in SUPPORTED_LOCALES {
+            for key in &critical_keys {
+                let translated = t!(*key, locale = locale);
+                // rust-i18n returns the key itself if not found
+                assert_ne!(
+                    translated.as_ref(),
+                    *key,
+                    "Missing key {} for locale {}",
+                    key,
+                    locale
+                );
+            }
+        }
     }
 }

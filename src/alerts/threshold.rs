@@ -3,6 +3,7 @@
 //! Monitors user reports and sends alerts when the count exceeds the configured threshold.
 
 use chrono::{Duration, Utc};
+use rust_i18n::t;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
@@ -10,6 +11,7 @@ use serenity::all::{ChannelId, Colour, Context, CreateEmbed, CreateEmbedFooter, 
 use tracing::{error, info, warn};
 
 use crate::entity::{bot_config, guild_configs, sent_alerts, user_configs, user_reports};
+use crate::i18n::{resolve_guild_locale_by_id, resolve_user_locale_by_id};
 
 // =============================================================================
 // Constants
@@ -20,16 +22,6 @@ const MAX_RECENT_REPORTS: u64 = 5;
 
 /// Alert color (orange/warning)
 const COLOR_ALERT: u32 = 0xf0b132;
-
-/// Incident type display names
-const INCIDENT_TYPES: &[(&str, &str)] = &[
-    ("login", "Login Issues"),
-    ("instance", "Instance/World Loading"),
-    ("api", "API/Website Issues"),
-    ("auth", "Authentication Issues"),
-    ("download", "Content Download Issues"),
-    ("other", "Other Issues"),
-];
 
 // =============================================================================
 // Public API
@@ -272,8 +264,11 @@ async fn send_guild_alert(
             RecordAlertResult::Error => return,       // Can't record - don't send
         };
 
+    // Resolve locale for this guild
+    let locale = resolve_guild_locale_by_id(db, &guild.guild_id).await;
+
     // Build and send embed
-    let embed = build_alert_embed(incident_type, count, interval, recent_reports);
+    let embed = build_alert_embed(incident_type, count, interval, recent_reports, &locale);
     let message = CreateMessage::new().embed(embed);
 
     let channel = ChannelId::new(channel_id);
@@ -342,8 +337,11 @@ async fn send_user_alert(
         }
     };
 
+    // Resolve locale for this user
+    let locale = resolve_user_locale_by_id(db, &user.user_id).await;
+
     // Build and send embed
-    let embed = build_alert_embed(incident_type, count, interval, recent_reports);
+    let embed = build_alert_embed(incident_type, count, interval, recent_reports, &locale);
     let message = CreateMessage::new().embed(embed);
 
     match dm_channel.send_message(&ctx.http, message).await {
@@ -380,12 +378,15 @@ fn generate_reference_id(incident_type: &str) -> String {
     format!("threshold_{}_{timestamp}:{block:02}", incident_type)
 }
 
-fn get_incident_display_name(incident_type: &str) -> &str {
-    INCIDENT_TYPES
-        .iter()
-        .find(|(value, _)| *value == incident_type)
-        .map(|(_, display)| *display)
-        .unwrap_or(incident_type)
+fn get_incident_display_name(incident_type: &str, locale: &str) -> String {
+    let key = format!("incident_types.{}", incident_type);
+    let translated = t!(&key, locale = locale);
+    // If translation key doesn't exist, rust-i18n returns the key itself
+    if translated.contains("incident_types.") {
+        incident_type.to_string()
+    } else {
+        translated.to_string()
+    }
 }
 
 fn build_alert_embed(
@@ -393,13 +394,14 @@ fn build_alert_embed(
     count: i64,
     interval: i64,
     recent_reports: &[chrono::DateTime<Utc>],
+    locale: &str,
 ) -> CreateEmbed {
-    let display_name = get_incident_display_name(incident_type);
+    let display_name = get_incident_display_name(incident_type, locale);
     let now = Utc::now();
 
     // Format recent reports as relative timestamps
     let recent_text = if recent_reports.is_empty() {
-        "No recent reports".to_string()
+        t!("embeds.alerts.threshold.no_recent_reports", locale = locale).to_string()
     } else {
         recent_reports
             .iter()
@@ -407,27 +409,36 @@ fn build_alert_embed(
                 let diff = now.signed_duration_since(*ts);
                 let mins = diff.num_minutes();
                 if mins < 1 {
-                    "- Just now".to_string()
+                    format!("- {}", t!("time.just_now", locale = locale))
                 } else if mins == 1 {
-                    "- 1 min ago".to_string()
+                    format!("- {}", t!("time.min_ago_one", locale = locale))
                 } else {
-                    format!("- {} min ago", mins)
+                    format!("- {}", t!("time.min_ago_many", n = mins, locale = locale))
                 }
             })
             .collect::<Vec<_>>()
             .join("\n")
     };
 
+    let title = t!("embeds.alerts.threshold.title", locale = locale);
+    let description = t!(
+        "embeds.alerts.threshold.description",
+        count = count,
+        incident_type = display_name,
+        interval = interval,
+        locale = locale
+    );
+    let field_name = t!(
+        "embeds.alerts.threshold.field_recent_reports",
+        locale = locale
+    );
+    let footer = t!("embeds.alerts.threshold.footer", locale = locale);
+
     CreateEmbed::default()
-        .title("High Report Volume Detected")
-        .description(format!(
-            "**{}** users reported **{}** in the last {} minutes.",
-            count, display_name, interval
-        ))
+        .title(title)
+        .description(description)
         .color(Colour::new(COLOR_ALERT))
-        .field("Recent Reports", recent_text, false)
-        .footer(CreateEmbedFooter::new(
-            "Check /status for official VRChat status",
-        ))
+        .field(field_name, recent_text, false)
+        .footer(CreateEmbedFooter::new(footer))
         .timestamp(serenity::all::Timestamp::now())
 }
