@@ -1,1 +1,8 @@
 /target
+/migration/target
+/data
+.env
+.env.test
+.DS_Store
+/output
+/examples
