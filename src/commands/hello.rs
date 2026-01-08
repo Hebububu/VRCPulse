@@ -1,9 +1,7 @@
 use rust_i18n::t;
-use serenity::all::{
-    CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
-};
+use serenity::all::{CommandInteraction, Context, CreateCommand};
 
+use crate::commands::shared::defer;
 use crate::i18n::resolve_locale_async;
 
 /// /hello command definition
@@ -16,16 +14,17 @@ pub fn register() -> CreateCommand {
 
 /// /hello command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
-    // Resolve locale from database preference, then Discord locale, then default
+    // Defer first to acknowledge within 3 seconds, then do DB lookup for locale
+    defer::defer(ctx, interaction).await?;
+
     let locale = resolve_locale_async(ctx, interaction).await;
 
-    let response = CreateInteractionResponseMessage::new().content(t!(
+    let response = serenity::builder::EditInteractionResponse::new().content(t!(
         "embeds.hello.message",
         locale = &locale,
         user = &interaction.user.name
     ));
 
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
+    interaction.edit_response(&ctx.http, response).await?;
+    Ok(())
 }

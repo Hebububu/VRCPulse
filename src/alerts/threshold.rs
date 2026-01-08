@@ -10,6 +10,7 @@ use sea_orm::{
 use serenity::all::{ChannelId, Colour, Context, CreateEmbed, CreateEmbedFooter, CreateMessage};
 use tracing::{error, info, warn};
 
+use crate::commands::shared::{colors, incident_types};
 use crate::entity::{bot_config, guild_configs, sent_alerts, user_configs, user_reports};
 use crate::i18n::{resolve_guild_locale_by_id, resolve_user_locale_by_id};
 
@@ -19,9 +20,6 @@ use crate::i18n::{resolve_guild_locale_by_id, resolve_user_locale_by_id};
 
 /// Maximum number of recent report timestamps to show in alert
 const MAX_RECENT_REPORTS: u64 = 5;
-
-/// Alert color (orange/warning)
-const COLOR_ALERT: u32 = 0xf0b132;
 
 // =============================================================================
 // Public API
@@ -378,17 +376,6 @@ fn generate_reference_id(incident_type: &str) -> String {
     format!("threshold_{}_{timestamp}:{block:02}", incident_type)
 }
 
-fn get_incident_display_name(incident_type: &str, locale: &str) -> String {
-    let key = format!("incident_types.{}", incident_type);
-    let translated = t!(&key, locale = locale);
-    // If translation key doesn't exist, rust-i18n returns the key itself
-    if translated.contains("incident_types.") {
-        incident_type.to_string()
-    } else {
-        translated.to_string()
-    }
-}
-
 fn build_alert_embed(
     incident_type: &str,
     count: i64,
@@ -396,7 +383,7 @@ fn build_alert_embed(
     recent_reports: &[chrono::DateTime<Utc>],
     locale: &str,
 ) -> CreateEmbed {
-    let display_name = get_incident_display_name(incident_type, locale);
+    let display_name = incident_types::display_name_localized(incident_type, locale);
     let now = Utc::now();
 
     // Format recent reports as relative timestamps
@@ -437,7 +424,7 @@ fn build_alert_embed(
     CreateEmbed::default()
         .title(title)
         .description(description)
-        .color(Colour::new(COLOR_ALERT))
+        .color(Colour::new(colors::MAJOR))
         .field(field_name, recent_text, false)
         .footer(CreateEmbedFooter::new(footer))
         .timestamp(serenity::all::Timestamp::now())

@@ -12,7 +12,7 @@ use serenity::all::{
 };
 
 use crate::commands::shared::respond_error;
-use crate::i18n::resolve_locale_async;
+use crate::i18n::resolve_locale;
 use context::determine_context;
 use handlers::{
     handle_language, handle_setup, handle_show, handle_unregister, handle_unregister_cancel,
@@ -111,7 +111,9 @@ pub fn register() -> CreateCommand {
 /// /config command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
     let options = &interaction.data.options();
-    let locale = resolve_locale_async(ctx, interaction).await;
+    // Use sync locale resolution for error messages (before defer)
+    // Each handler will call resolve_locale_async after deferring for full DB lookup
+    let locale = resolve_locale(interaction);
 
     let Some(subcommand) = options.first() else {
         return respond_error(ctx, interaction, "Missing subcommand", &locale).await;

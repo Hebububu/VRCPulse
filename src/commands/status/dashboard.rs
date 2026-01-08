@@ -8,6 +8,7 @@ use serenity::all::{
 };
 use tracing::error;
 
+use crate::commands::shared::{colors, defer, embeds};
 use crate::entity::{component_logs, status_logs};
 use crate::i18n::resolve_locale_async;
 use crate::state::AppStateKey;
@@ -24,7 +25,7 @@ pub fn register() -> CreateCommand {
 /// /status command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
     // Defer response since dashboard generation takes time
-    interaction.defer(&ctx.http).await?;
+    defer::defer(ctx, interaction).await?;
 
     let locale = resolve_locale_async(ctx, interaction).await;
 
@@ -72,18 +73,18 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             let (status_emoji, status_text, embed_color) = match system_status {
                 Some(ref s) => {
                     let (emoji, color) = match s.indicator.as_str() {
-                        "none" => ("🟢", 0x57f287),
-                        "minor" => ("🟡", 0xfee75c),
-                        "major" => ("🟠", 0xf0b132),
-                        "critical" => ("🔴", 0xed4245),
-                        _ => ("⚪", 0x00b0f4),
+                        "none" => ("🟢", colors::SUCCESS),
+                        "minor" => ("🟡", colors::WARNING),
+                        "major" => ("🟠", colors::MAJOR),
+                        "critical" => ("🔴", colors::ERROR),
+                        _ => ("⚪", colors::BRAND),
                     };
                     (emoji, s.description.clone(), color)
                 }
                 None => (
                     "⚪",
                     t!("status.unknown", locale = &locale).to_string(),
-                    0x00b0f4,
+                    colors::BRAND,
                 ),
             };
 
@@ -159,14 +160,12 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         Err(e) => {
             error!(error = %e, "Failed to generate dashboard");
 
-            let embed = CreateEmbed::default()
-                .title(t!("embeds.dashboard.error_title", locale = &locale))
-                .description(t!("embeds.dashboard.error_description", locale = &locale))
-                .color(Colour::new(0xed4245));
+            let embed = embeds::error_embed(
+                t!("embeds.dashboard.error_title", locale = &locale),
+                t!("embeds.dashboard.error_description", locale = &locale),
+            );
 
-            let response = serenity::builder::EditInteractionResponse::new().embed(embed);
-
-            interaction.edit_response(&ctx.http, response).await?;
+            defer::edit_embed(ctx, interaction, embed).await?;
         }
     }
 

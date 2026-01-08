@@ -6,14 +6,14 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 use serenity::all::{
-    Colour, CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
-    ResolvedValue, Timestamp,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateEmbedFooter, ResolvedValue, Timestamp,
 };
 use tracing::{error, info};
 
+use crate::commands::shared::{defer, embeds, incident_types, respond_error};
 use crate::entity::{bot_config, guild_configs, user_configs, user_reports};
-use crate::i18n::resolve_locale_async;
+use crate::i18n::{resolve_locale, resolve_locale_async};
 use crate::state::AppStateKey;
 
 // =============================================================================
@@ -25,48 +25,6 @@ const DUPLICATE_COOLDOWN_MINUTES: i64 = 5;
 
 /// Maximum length for details field
 const MAX_DETAILS_LENGTH: usize = 500;
-
-/// Brand color for embeds
-const COLOR_BRAND: u32 = 0x00b0f4;
-/// Success color for embeds
-const COLOR_SUCCESS: u32 = 0x57f287;
-/// Error color for embeds
-const COLOR_ERROR: u32 = 0xed4245;
-/// Warning color for embeds
-const COLOR_WARNING: u32 = 0xfee75c;
-
-// =============================================================================
-// Incident Types
-// =============================================================================
-
-/// Available incident type keys for reporting
-const INCIDENT_TYPE_KEYS: &[&str] = &["login", "instance", "api", "auth", "download", "other"];
-
-/// Get display name for incident type using i18n
-fn get_incident_display_name(incident_type: &str) -> String {
-    match incident_type {
-        "login" => t!("incident_types.login").to_string(),
-        "instance" => t!("incident_types.instance").to_string(),
-        "api" => t!("incident_types.api").to_string(),
-        "auth" => t!("incident_types.auth").to_string(),
-        "download" => t!("incident_types.download").to_string(),
-        "other" => t!("incident_types.other").to_string(),
-        _ => incident_type.to_string(),
-    }
-}
-
-/// Get localized display name for incident type
-fn get_incident_display_name_localized(incident_type: &str, locale: &str) -> String {
-    match incident_type {
-        "login" => t!("incident_types.login", locale = locale).to_string(),
-        "instance" => t!("incident_types.instance", locale = locale).to_string(),
-        "api" => t!("incident_types.api", locale = locale).to_string(),
-        "auth" => t!("incident_types.auth", locale = locale).to_string(),
-        "download" => t!("incident_types.download", locale = locale).to_string(),
-        "other" => t!("incident_types.other", locale = locale).to_string(),
-        _ => incident_type.to_string(),
-    }
-}
 
 // =============================================================================
 // Command Registration
@@ -84,9 +42,9 @@ pub fn register() -> CreateCommand {
     .required(true);
 
     // Add choices for incident types with localization
-    for key in INCIDENT_TYPE_KEYS {
-        let display_en = get_incident_display_name(key);
-        let display_ko = get_incident_display_name_localized(key, "ko");
+    for key in incident_types::INCIDENT_TYPE_KEYS {
+        let display_en = incident_types::display_name(key);
+        let display_ko = incident_types::display_name_localized(key, "ko");
         incident_type_option = incident_type_option.add_string_choice_localized(
             display_en,
             *key,
@@ -113,7 +71,8 @@ pub fn register() -> CreateCommand {
 
 /// /report command handler
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
-    let locale = resolve_locale_async(ctx, interaction).await;
+    // Use sync locale for validation errors (before defer)
+    let sync_locale = resolve_locale(interaction);
     let options = interaction.data.options();
 
     // Parse incident_type (required)
@@ -132,8 +91,8 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         return respond_error(
             ctx,
             interaction,
-            &t!("errors.missing_incident_type", locale = &locale),
-            &locale,
+            &t!("errors.missing_incident_type", locale = &sync_locale),
+            &sync_locale,
         )
         .await;
     };
@@ -159,14 +118,20 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             interaction,
             &t!(
                 "errors.details_too_long",
-                locale = &locale,
+                locale = &sync_locale,
                 max = MAX_DETAILS_LENGTH,
                 current = d.len()
             ),
-            &locale,
+            &sync_locale,
         )
         .await;
     }
+
+    // Defer response before DB operations
+    defer(ctx, interaction).await?;
+
+    // Now resolve locale with full DB lookup
+    let locale = resolve_locale_async(ctx, interaction).await;
 
     // Get database
     let data = ctx.data.read().await;
@@ -183,7 +148,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     match check_registration(db, guild_id, user_id).await {
         RegistrationStatus::Registered => {}
         RegistrationStatus::GuildNotRegistered => {
-            return respond_error(
+            return defer::edit_error(
                 ctx,
                 interaction,
                 &t!("embeds.report.error_guild_not_registered", locale = &locale),
@@ -192,7 +157,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             .await;
         }
         RegistrationStatus::UserNotRegistered => {
-            return respond_user_intro(ctx, interaction, &locale).await;
+            return edit_user_intro(ctx, interaction, &locale).await;
         }
     }
 
@@ -205,21 +170,19 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             // User is in cooldown - show when they can report again
             let can_report_at = last_report_time + Duration::minutes(DUPLICATE_COOLDOWN_MINUTES);
             let time_text = format!("<t:{}:R>", can_report_at.timestamp());
-            return respond_warning(
-                ctx,
-                interaction,
-                &t!("embeds.report.cooldown.title", locale = &locale),
-                &t!(
+            let embed = embeds::warning_embed(
+                t!("embeds.report.cooldown.title", locale = &locale),
+                t!(
                     "embeds.report.cooldown.description",
                     locale = &locale,
                     time = time_text
                 ),
-            )
-            .await;
+            );
+            return defer::edit_embed(ctx, interaction, embed).await;
         }
         ReportInsertResult::Error(e) => {
             error!(error = %e, "Failed to insert report");
-            return respond_error(
+            return defer::edit_error(
                 ctx,
                 interaction,
                 &t!("embeds.report.error_insert_failed", locale = &locale),
@@ -245,7 +208,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     );
 
     // Success response
-    let display_name = get_incident_display_name_localized(incident_type, &locale);
+    let display_name = incident_types::display_name_localized(incident_type, &locale);
     let others_text = if similar_count == 0 {
         t!("embeds.report.success.others_none", locale = &locale).to_string()
     } else if similar_count == 1 {
@@ -265,25 +228,22 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .to_string()
     };
 
-    let embed = CreateEmbed::default()
-        .title(t!("embeds.report.success.title", locale = &locale))
-        .description(t!(
+    let embed = embeds::success_embed(
+        t!("embeds.report.success.title", locale = &locale),
+        t!(
             "embeds.report.success.description",
             locale = &locale,
             incident_type = display_name,
             others_text = others_text
-        ))
-        .color(Colour::new(COLOR_SUCCESS))
-        .footer(CreateEmbedFooter::new(t!(
-            "embeds.report.success.footer",
-            locale = &locale
-        )))
-        .timestamp(Timestamp::now());
+        ),
+    )
+    .footer(CreateEmbedFooter::new(t!(
+        "embeds.report.success.footer",
+        locale = &locale
+    )))
+    .timestamp(Timestamp::now());
 
-    let response = CreateInteractionResponseMessage::new().embed(embed);
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
+    defer::edit_embed(ctx, interaction, embed).await
 }
 
 // =============================================================================
@@ -502,81 +462,35 @@ async fn get_report_interval(db: &DatabaseConnection) -> i64 {
 }
 
 // =============================================================================
-// Response Helpers
+// Edit Helpers (after defer - edit deferred response)
 // =============================================================================
 
-async fn respond_error(
-    ctx: &Context,
-    interaction: &CommandInteraction,
-    message: &str,
-    locale: &str,
-) -> Result<(), serenity::Error> {
-    let embed = CreateEmbed::default()
-        .title(t!("embeds.dashboard.error_title", locale = locale))
-        .description(message)
-        .color(Colour::new(COLOR_ERROR));
-
-    let response = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
-}
-
-async fn respond_warning(
-    ctx: &Context,
-    interaction: &CommandInteraction,
-    title: &str,
-    message: &str,
-) -> Result<(), serenity::Error> {
-    let embed = CreateEmbed::default()
-        .title(title)
-        .description(message)
-        .color(Colour::new(COLOR_WARNING));
-
-    let response = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
-}
-
-async fn respond_user_intro(
+async fn edit_user_intro(
     ctx: &Context,
     interaction: &CommandInteraction,
     locale: &str,
 ) -> Result<(), serenity::Error> {
-    let embed = CreateEmbed::default()
-        .title(t!("embeds.report.intro.title", locale = locale))
-        .description(t!("embeds.report.intro.description", locale = locale))
-        .color(Colour::new(COLOR_BRAND))
-        .field(
-            t!("embeds.report.intro.field_getting_started", locale = locale),
-            t!(
-                "embeds.report.intro.field_getting_started_value",
-                locale = locale
-            ),
-            false,
-        )
-        .field(
-            t!("embeds.report.intro.field_commands", locale = locale),
-            t!("embeds.report.intro.field_commands_value", locale = locale),
-            false,
-        )
-        .footer(CreateEmbedFooter::new(t!(
-            "embeds.report.intro.footer",
+    let embed = embeds::info_embed(
+        t!("embeds.report.intro.title", locale = locale),
+        t!("embeds.report.intro.description", locale = locale),
+    )
+    .field(
+        t!("embeds.report.intro.field_getting_started", locale = locale),
+        t!(
+            "embeds.report.intro.field_getting_started_value",
             locale = locale
-        )));
+        ),
+        false,
+    )
+    .field(
+        t!("embeds.report.intro.field_commands", locale = locale),
+        t!("embeds.report.intro.field_commands_value", locale = locale),
+        false,
+    )
+    .footer(CreateEmbedFooter::new(t!(
+        "embeds.report.intro.footer",
+        locale = locale
+    )));
 
-    let response = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-
-    interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response))
-        .await
+    defer::edit_embed(ctx, interaction, embed).await
 }
