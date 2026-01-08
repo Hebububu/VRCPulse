@@ -12,7 +12,7 @@ use reqwest::Client;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch;
 use tokio::time::{Interval, MissedTickBehavior, interval};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub use config::{CollectorConfigRx, CollectorConfigTx};
 
@@ -59,7 +59,7 @@ async fn poll_loop_dynamic<F, Fut>(
             _ = ticker.tick() => {
                 match poll_fn().await {
                     Ok(()) => {
-                        info!(poller = name, "Polled");
+                        debug!(poller = name, "Polled");
                     }
                     Err(e) => {
                         error!(poller = name, error = %e, "Poll failed");

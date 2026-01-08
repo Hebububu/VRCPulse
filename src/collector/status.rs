@@ -1,7 +1,7 @@
 use chrono::Utc;
 use reqwest::Client;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::entity::{component_logs, status_logs};
 
@@ -32,7 +32,7 @@ pub async fn poll(client: &Client, db: &DatabaseConnection) -> Result<()> {
             ..Default::default()
         };
         status_log.insert(db).await?;
-        info!(
+        debug!(
             indicator = %response.status.indicator,
             "Inserted new status log"
         );
