@@ -77,6 +77,20 @@ fn hours_from_range(range: &str) -> i64 {
     }
 }
 
+/// Map dashboard-friendly names to actual database metric names
+fn resolve_db_metric(name: &str) -> &str {
+    match name {
+        "online_users" => "visits",
+        "api_error_rate" => "api_errors",
+        "steam_auth" => "extauth_steam_count",
+        "meta_auth" => "extauth_oculus_count",
+        // These match directly
+        "api_latency" => "api_latency",
+        "api_requests" => "api_requests",
+        other => other,
+    }
+}
+
 fn metric_data_to_response(name: &str, data: MetricData) -> MetricResponse {
     MetricResponse {
         name: name.to_string(),
@@ -118,10 +132,11 @@ impl VrcPulseService {
     ) -> Result<MetricResponse, sea_orm::DbErr> {
         let hours = hours_from_range(range);
         let cutoff = Utc::now() - Duration::hours(hours);
+        let db_name = resolve_db_metric(name);
 
         use crate::entity::metric_logs;
         let data: Vec<metric_logs::Model> = metric_logs::Entity::find()
-            .filter(metric_logs::Column::MetricName.eq(name))
+            .filter(metric_logs::Column::MetricName.eq(db_name))
             .filter(metric_logs::Column::Timestamp.gte(cutoff))
             .order_by_asc(metric_logs::Column::Timestamp)
             .all(&self.db)
@@ -134,15 +149,7 @@ impl VrcPulseService {
         };
 
         let downsampled = query::downsample(metric_data);
-
-        // Auto-convert 0-1 values to percentage for rate metrics
-        let final_data = if name.contains("rate") || name.contains("auth") {
-            query::to_percent(downsampled)
-        } else {
-            downsampled
-        };
-
-        Ok(metric_data_to_response(name, final_data))
+        Ok(metric_data_to_response(name, downsampled))
     }
 
     pub async fn get_dashboard(&self, range: &str) -> Result<DashboardResponse, sea_orm::DbErr> {
