@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatusResponse } from '../types';
+  import logoImg from '../../assets/logo.png';
 
   interface Props {
     status: StatusResponse | null;
@@ -46,6 +47,7 @@
 
 <header class="status-bar">
   <div class="left">
+    <img src={logoImg} alt="VRCPulse" class="app-logo" />
     <span class="app-name">VRCPulse</span>
     <span class="status-dot" style="background: {statusColor}"></span>
     <span class="status-label" style="color: {statusColor}">{statusLabel}</span>
@@ -71,6 +73,11 @@
     display: flex;
     align-items: center;
     gap: 12px;
+  }
+
+  .app-logo {
+    width: 28px;
+    height: 28px;
   }
 
   .app-name {

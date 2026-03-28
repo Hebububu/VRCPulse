@@ -170,6 +170,7 @@
     background: #1a1d27;
     border: 1px solid #2a2d37;
     overflow: hidden;
+    min-width: 0;
   }
 
   .chart-header {

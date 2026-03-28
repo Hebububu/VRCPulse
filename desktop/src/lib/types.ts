@@ -46,3 +46,12 @@ export interface Maintenance {
 export interface MaintenancesListResponse {
   maintenances: Maintenance[];
 }
+
+export interface IncidentSnapshotResponse {
+  incident_id: string;
+  title: string;
+  impact: string;
+  status: string;
+  update_count: number;
+  fetched_at: string;
+}

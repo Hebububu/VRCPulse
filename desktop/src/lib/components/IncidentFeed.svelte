@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { push } from 'svelte-spa-router';
   import type { Incident } from '../types';
 
   interface Props {
@@ -6,6 +7,8 @@
   }
 
   let { incidents }: Props = $props();
+
+  const recent = $derived(incidents.slice(0, 5));
 
   function timeAgo(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -24,25 +27,38 @@
       default: return '#71717a';
     }
   }
+
+  function statusBadgeColor(status: string): string {
+    switch (status) {
+      case 'resolved': return '#22c55e';
+      case 'monitoring': return '#60a5fa';
+      case 'identified': return '#eab308';
+      case 'investigating': return '#f97316';
+      default: return '#71717a';
+    }
+  }
 </script>
 
 <div class="feed">
-  <h3 class="feed-title">Incidents</h3>
-  {#if incidents.length === 0}
-    <div class="empty">No active incidents &#x2713;</div>
+  <div class="feed-header">
+    <h3 class="feed-title">Recent Incidents</h3>
+    <button class="view-all" onclick={() => push('/incidents')}>View All</button>
+  </div>
+
+  {#if recent.length === 0}
+    <div class="empty">No incidents recorded</div>
   {:else}
-    {#each incidents as incident}
-      <div class="incident">
+    {#each recent as incident}
+      <button class="incident" onclick={() => push(`/incidents/${incident.id}`)}>
         <div class="incident-header">
           <span class="impact-dot" style="background: {impactColor(incident.impact)}"></span>
           <span class="incident-name">{incident.name}</span>
+        </div>
+        <div class="incident-meta">
+          <span class="status-badge" style="color: {statusBadgeColor(incident.status)}">{incident.status}</span>
           <span class="incident-time">{timeAgo(incident.created_at)}</span>
         </div>
-        <div class="incident-status">{incident.status}</div>
-        {#if incident.updates.length > 0}
-          <div class="latest-update">{incident.updates[0].body}</div>
-        {/if}
-      </div>
+      </button>
     {/each}
   {/if}
 </div>
@@ -55,28 +71,64 @@
     overflow-y: auto;
   }
 
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
   .feed-title {
     font-size: 12px;
     font-weight: 500;
     color: #71717a;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin: 0 0 12px 0;
+    margin: 0;
+  }
+
+  .view-all {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: #60a5fa;
+    background: none;
+    border: 1px solid #2a2d37;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+
+  .view-all:hover {
+    background: #22252f;
   }
 
   .empty {
     font-size: 14px;
-    color: #22c55e;
+    color: #71717a;
     font-family: 'Geist Mono', monospace;
   }
 
   .incident {
-    padding: 12px 0;
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 0;
+    border: none;
     border-bottom: 1px solid #2a2d37;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    font-family: inherit;
   }
 
   .incident:last-child {
     border-bottom: none;
+  }
+
+  .incident:hover {
+    background: #22252f;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    width: calc(100% + 32px);
   }
 
   .incident-header {
@@ -93,31 +145,32 @@
   }
 
   .incident-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #e4e4e7;
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .incident-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+    margin-left: 14px;
+  }
+
+  .status-badge {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: capitalize;
   }
 
   .incident-time {
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
     color: #71717a;
-  }
-
-  .incident-status {
-    font-size: 12px;
-    color: #71717a;
-    margin-top: 4px;
-    margin-left: 14px;
-    text-transform: capitalize;
-  }
-
-  .latest-update {
-    font-size: 13px;
-    color: #a1a1aa;
-    margin-top: 6px;
-    margin-left: 14px;
-    line-height: 1.4;
   }
 </style>

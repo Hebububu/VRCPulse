@@ -1,24 +1,18 @@
 <script lang="ts">
-  import StatusBar from './lib/components/StatusBar.svelte';
-  import Dashboard from './lib/components/Dashboard.svelte';
-  import type { StatusResponse } from './lib/types';
+  import Router from 'svelte-spa-router';
+  import DashboardPage from './lib/pages/DashboardPage.svelte';
+  import IncidentList from './lib/pages/IncidentList.svelte';
+  import IncidentDetail from './lib/pages/IncidentDetail.svelte';
 
-  let status: StatusResponse | null = $state(null);
-  let lastUpdated: Date | null = $state(null);
-
-  function handleStatusUpdate(newStatus: StatusResponse) {
-    status = newStatus;
-    lastUpdated = new Date();
-  }
-
-  function handleDataReceived() {
-    lastUpdated = new Date();
-  }
+  const routes = {
+    '/': DashboardPage,
+    '/incidents': IncidentList,
+    '/incidents/:id': IncidentDetail,
+  };
 </script>
 
 <main>
-  <StatusBar {status} {lastUpdated} />
-  <Dashboard onStatusUpdate={handleStatusUpdate} onDataReceived={handleDataReceived} />
+  <Router {routes} />
 </main>
 
 <style>

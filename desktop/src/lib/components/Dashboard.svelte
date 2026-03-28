@@ -22,7 +22,7 @@
     try {
       const [dashData, incData] = await Promise.all([
         getDashboard(range),
-        getIncidents('active'),
+        getIncidents('all'),
       ]);
       dashboard = dashData;
       incidents = incData.incidents;
@@ -139,6 +139,8 @@
     padding: 16px;
     gap: 16px;
     overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 0;
   }
 
   .toolbar {
@@ -171,6 +173,7 @@
     display: flex;
     gap: 16px;
     flex: 1;
+    min-width: 0;
   }
 
   .charts-area {
@@ -178,6 +181,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
   }
 
   .chart-grid {

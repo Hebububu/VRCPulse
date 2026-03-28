@@ -1,4 +1,4 @@
-import type { DashboardResponse, IncidentsListResponse, MaintenancesListResponse } from './types';
+import type { DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, MaintenancesListResponse } from './types';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
@@ -20,8 +20,12 @@ export async function getDashboard(range: string = '12h'): Promise<DashboardResp
   return fetchApi(`/metrics/dashboard?range=${range}`);
 }
 
-export async function getIncidents(status: string = 'active'): Promise<IncidentsListResponse> {
+export async function getIncidents(status: string = 'all'): Promise<IncidentsListResponse> {
   return fetchApi(`/incidents?status=${status}`);
+}
+
+export async function getIncidentHistory(incidentId: string): Promise<IncidentSnapshotResponse[]> {
+  return fetchApi(`/incidents/history/${incidentId}`);
 }
 
 export async function getMaintenances(status: string = 'upcoming'): Promise<MaintenancesListResponse> {
