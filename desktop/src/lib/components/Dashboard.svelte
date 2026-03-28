@@ -85,7 +85,11 @@
         <Chart
           data={dashboard?.metrics?.api_requests ?? null}
           title="API Requests"
+          unit="req/s"
         />
+      </div>
+
+      <div class="chart-grid">
         <Chart
           data={dashboard?.metrics?.api_error_rate ?? null}
           title="Error Rate"
@@ -96,7 +100,7 @@
         />
         <Chart
           data={dashboard?.metrics?.steam_auth ?? null}
-          title="Steam Auth"
+          title="Steam Auth Success"
           type="area"
           unit="%"
         />
@@ -105,8 +109,17 @@
       <div class="chart-grid">
         <Chart
           data={dashboard?.metrics?.meta_auth ?? null}
-          title="Meta Auth"
+          title="Meta Auth Success"
           type="area"
+          unit="%"
+        />
+        <Chart
+          data={dashboard?.metrics?.steam_share ?? null}
+          label1="Steam"
+          data2={dashboard?.metrics?.meta_share ?? null}
+          label2="Meta"
+          color2="#a78bfa"
+          title="Platform Share"
           unit="%"
         />
       </div>

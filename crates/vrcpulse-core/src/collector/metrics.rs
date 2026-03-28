@@ -62,7 +62,7 @@ async fn poll_metric(
 
         let active = metric_logs::ActiveModel {
             metric_name: Set(metric.name.to_string()),
-            value: Set(value),
+            value: Set(value * metric.scale),
             unit: Set(metric.unit.to_string()),
             interval_sec: Set(METRIC_INTERVAL_SEC),
             timestamp: Set(dt),

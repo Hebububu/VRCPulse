@@ -82,8 +82,10 @@ fn resolve_db_metric(name: &str) -> &str {
     match name {
         "online_users" => "visits",
         "api_error_rate" => "api_errors",
-        "steam_auth" => "extauth_steam_count",
-        "meta_auth" => "extauth_oculus_count",
+        "steam_auth" => "extauth_steam",
+        "meta_auth" => "extauth_oculus",
+        "steam_share" => "extauth_steam_count",
+        "meta_share" => "extauth_oculus_count",
         // These match directly
         "api_latency" => "api_latency",
         "api_requests" => "api_requests",
@@ -160,6 +162,8 @@ impl VrcPulseService {
             "api_error_rate",
             "steam_auth",
             "meta_auth",
+            "steam_share",
+            "meta_share",
         ];
 
         let mut metrics = std::collections::HashMap::new();

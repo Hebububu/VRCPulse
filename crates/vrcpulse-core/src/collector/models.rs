@@ -96,48 +96,60 @@ pub struct MetricDefinition {
     pub endpoint: &'static str,
     pub name: &'static str,
     pub unit: &'static str,
+    /// Multiply raw value by this factor before storing (e.g. 1000.0 for seconds → ms)
+    pub scale: f64,
 }
 
 /// All available CloudFront metrics
+/// Note: CloudFront API returns latency in seconds and rates as 0-1 fractions.
+/// Scale factors convert to human-friendly units on ingest.
 pub const CLOUDFRONT_METRICS: &[MetricDefinition] = &[
     MetricDefinition {
         endpoint: "/apilatency.json",
         name: "api_latency",
         unit: "ms",
+        scale: 1000.0, // seconds → milliseconds
     },
     MetricDefinition {
         endpoint: "/visits.json",
         name: "visits",
         unit: "count",
+        scale: 1.0,
     },
     MetricDefinition {
         endpoint: "/apirequests.json",
         name: "api_requests",
-        unit: "count",
+        unit: "req/s",
+        scale: 1.0, // already requests per second
     },
     MetricDefinition {
         endpoint: "/apierrors.json",
         name: "api_errors",
-        unit: "count",
+        unit: "%",
+        scale: 100.0, // fraction → percentage
     },
     MetricDefinition {
         endpoint: "/extauth_steam.json",
         name: "extauth_steam",
-        unit: "ms",
+        unit: "%",
+        scale: 100.0, // fraction → percentage (success rate)
     },
     MetricDefinition {
         endpoint: "/extauth_oculus.json",
         name: "extauth_oculus",
-        unit: "ms",
+        unit: "%",
+        scale: 100.0, // fraction → percentage (success rate)
     },
     MetricDefinition {
         endpoint: "/extauth_steam_count.json",
         name: "extauth_steam_count",
-        unit: "count",
+        unit: "%",
+        scale: 100.0, // fraction → percentage
     },
     MetricDefinition {
         endpoint: "/extauth_oculus_count.json",
         name: "extauth_oculus_count",
-        unit: "count",
+        unit: "%",
+        scale: 100.0, // fraction → percentage
     },
 ];

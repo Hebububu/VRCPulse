@@ -5,6 +5,10 @@
 
   interface Props {
     data: MetricResponse | null;
+    label1?: string;
+    data2?: MetricResponse | null;
+    label2?: string;
+    color2?: string;
     title: string;
     type?: 'line' | 'area';
     unit?: string;
@@ -13,22 +17,24 @@
     hero?: boolean;
   }
 
-  let { data, title, type: chartType = 'line', unit = '', thresholdValue, thresholdColor, hero = false }: Props = $props();
+  let { data, label1, data2, label2, color2 = '#a78bfa', title, type: chartType = 'line', unit = '', thresholdValue, thresholdColor, hero = false }: Props = $props();
+
+  /** Dynamic precision: find enough decimals to show meaningful digits */
+  function smartFormat(v: number, suffix: string = ''): string {
+    if (v === 0) return `0${suffix}`;
+    const abs = Math.abs(v);
+    if (abs >= 1000) return `${(v / 1000).toFixed(1)}K${suffix}`;
+    if (abs >= 100) return `${v.toFixed(0)}${suffix}`;
+    if (abs >= 10) return `${v.toFixed(1)}${suffix}`;
+    if (abs >= 1) return `${v.toFixed(2)}${suffix}`;
+    // For values < 1, find first significant digit
+    const digits = Math.max(0, Math.ceil(-Math.log10(abs))) + 2;
+    return `${v.toFixed(Math.min(digits, 8))}${suffix}`;
+  }
 
   function formatHeaderValue(v: number): string {
-    if (unit === '%') {
-      if (v < 0.01) return `${v.toFixed(3)}%`;
-      if (v < 1) return `${v.toFixed(2)}%`;
-      return `${v.toFixed(1)}%`;
-    }
-    if (unit === 'ms') {
-      if (v < 1) return `${v.toFixed(3)}ms`;
-      if (v < 10) return `${v.toFixed(1)}ms`;
-      return `${v.toFixed(0)}ms`;
-    }
-    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
-    if (v < 1) return v.toFixed(3);
-    return v.toFixed(0);
+    const s = unit || '';
+    return smartFormat(v, s);
   }
 
   let container: HTMLDivElement;
@@ -66,21 +72,8 @@
     const times = data.timestamps.map(t => new Date(t));
     const values = data.values;
 
-    const formatValue = (v: number) => {
-      if (unit === '%') {
-        if (v < 0.01) return `${v.toFixed(3)}%`;
-        if (v < 1) return `${v.toFixed(2)}%`;
-        return `${v.toFixed(1)}%`;
-      }
-      if (unit === 'ms') {
-        if (v < 1) return `${v.toFixed(3)}ms`;
-        if (v < 10) return `${v.toFixed(1)}ms`;
-        return `${v.toFixed(0)}ms`;
-      }
-      if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
-      if (v < 1) return v.toFixed(3);
-      return v.toFixed(0);
-    };
+    const suffix = unit || '';
+    const formatValue = (v: number) => smartFormat(v, suffix);
 
     const markLine = thresholdValue != null ? {
       data: [{ yAxis: thresholdValue, label: { show: false } }],
@@ -114,23 +107,47 @@
         borderColor: '#2a2d37',
         textStyle: { color: '#e4e4e7', fontSize: 12, fontFamily: 'Geist Mono, monospace' },
         formatter: (params: any) => {
-          const p = Array.isArray(params) ? params[0] : params;
-          const date = new Date(p.value[0]);
+          const items = Array.isArray(params) ? params : [params];
+          const date = new Date(items[0].value[0]);
           const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          return `${time}<br/><strong>${formatValue(p.value[1])}</strong>`;
+          let html = time;
+          for (const item of items) {
+            const color = item.color || '#60a5fa';
+            const name = item.seriesName || '';
+            html += `<br/><span style="color:${color}">${name ? name + ': ' : ''}<strong>${formatValue(item.value[1])}</strong></span>`;
+          }
+          return html;
         },
       },
-      series: [{
-        type: 'line',
-        showSymbol: false,
-        smooth: true,
-        lineStyle: { color: '#60a5fa', width: 2 },
-        areaStyle: chartType === 'area' ? { color: 'rgba(96, 165, 250, 0.15)' } : undefined,
-        data: times.map((t, i) => [t.getTime(), values[i]]),
-        markLine,
-        animationDuration: 300,
-        animationEasing: 'cubicOut',
-      }],
+      series: (() => {
+        const s: any[] = [{
+          name: data2 ? (label1 || 'Primary') : '',
+          type: 'line',
+          showSymbol: false,
+          smooth: true,
+          lineStyle: { color: '#60a5fa', width: 2 },
+          areaStyle: chartType === 'area' ? { color: 'rgba(96, 165, 250, 0.15)' } : undefined,
+          data: times.map((t, i) => [t.getTime(), values[i]]),
+          markLine,
+          animationDuration: 300,
+          animationEasing: 'cubicOut',
+        }];
+        if (data2 && data2.values.length > 0) {
+          const times2 = data2.timestamps.map(t => new Date(t));
+          s.push({
+            name: label2 || 'Secondary',
+            type: 'line',
+            showSymbol: false,
+            smooth: true,
+            lineStyle: { color: color2, width: 2 },
+            areaStyle: chartType === 'area' ? { color: color2.replace(')', ', 0.15)').replace('rgb', 'rgba') } : undefined,
+            data: times2.map((t, i) => [t.getTime(), data2.values[i]]),
+            animationDuration: 300,
+            animationEasing: 'cubicOut',
+          });
+        }
+        return s;
+      })(),
     }, true);
   });
 </script>
@@ -139,7 +156,10 @@
   <div class="chart-header">
     <span class="chart-title">{title}</span>
     {#if data && data.values.length > 0}
-      <span class="chart-value">{formatHeaderValue(data.values[data.values.length - 1])}</span>
+      <span class="chart-value" style="color: #60a5fa">{formatHeaderValue(data.values[data.values.length - 1])}</span>
+    {/if}
+    {#if data2 && data2.values.length > 0}
+      <span class="chart-value" style="color: {color2}; margin-left: 8px; font-size: 16px">{formatHeaderValue(data2.values[data2.values.length - 1])}</span>
     {/if}
   </div>
   <div class="chart-container" bind:this={container}></div>
