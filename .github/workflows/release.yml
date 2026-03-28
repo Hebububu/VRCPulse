@@ -1,0 +1,201 @@
+name: Release
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: universal-apple-darwin
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tauri-${{ matrix.platform }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
+
+      - name: Install Tauri CLI
+        run: command -v cargo-tauri >/dev/null 2>&1 || cargo install tauri-cli --locked --version "^2"
+
+      - name: Install frontend dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Set version from tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          node -e "
+            const fs = require('fs');
+            const f = 'desktop/src-tauri/tauri.conf.json';
+            const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+            d.version = '${VERSION}';
+            fs.writeFileSync(f, JSON.stringify(d, null, 2));
+          "
+          echo "Set version to ${VERSION}"
+
+      - name: Build Tauri app (macOS universal)
+        if: matrix.platform == 'macos-latest'
+        working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo tauri build --target universal-apple-darwin
+
+      - name: Build Tauri app (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: cargo tauri build
+
+      - name: Build Tauri app (Windows)
+        if: matrix.platform == 'windows-latest'
+        working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: cargo tauri build
+
+      - name: List build output
+        run: find target -name "*.dmg" -o -name "*.app.tar.gz" -o -name "*.sig" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.nsis.zip" 2>/dev/null | head -30 || true
+
+      - name: Collect artifacts (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          mkdir -p artifacts
+          find target -name "*.dmg" -exec cp {} artifacts/ \; || true
+          find target -name "*.app.tar.gz" -exec cp {} artifacts/ \; || true
+          find target -name "*.app.tar.gz.sig" -exec cp {} artifacts/ \; || true
+
+      - name: Collect artifacts (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          mkdir -p artifacts
+          find target -name "*.deb" -exec cp {} artifacts/ \; || true
+          find target -name "*.rpm" -exec cp {} artifacts/ \; || true
+          find target -name "*.AppImage" -exec cp {} artifacts/ \; || true
+          find target -name "*.AppImage.sig" -exec cp {} artifacts/ \; || true
+
+      - name: Collect artifacts (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          mkdir -p artifacts
+          find target -name "*-setup.exe" -exec cp {} artifacts/ \; || true
+          find target -name "*-setup.exe.sig" -exec cp {} artifacts/ \; || true
+          find target -name "*.nsis.zip" -exec cp {} artifacts/ \; || true
+          find target -name "*.nsis.zip.sig" -exec cp {} artifacts/ \; || true
+          find target/release -maxdepth 1 -name "*.exe" ! -name "*-setup.exe" -exec cp {} artifacts/VRCPulse-portable.exe \; || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform }}
+          path: artifacts/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find all-artifacts -type f
+
+      - name: Generate latest.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          REPO="${{ github.repository }}"
+          BASE_URL="https://github.com/${REPO}/releases/download/${GITHUB_REF_NAME}"
+
+          # Find actual filenames
+          MAC_FILE=$(ls all-artifacts/*.app.tar.gz 2>/dev/null | head -1 | xargs basename 2>/dev/null || echo "")
+          LINUX_FILE=$(ls all-artifacts/*.AppImage 2>/dev/null | head -1 | xargs basename 2>/dev/null || echo "")
+          WIN_FILE=$(ls all-artifacts/*-setup.exe 2>/dev/null | head -1 | xargs basename 2>/dev/null || echo "")
+
+          echo "MAC_FILE=$MAC_FILE LINUX_FILE=$LINUX_FILE WIN_FILE=$WIN_FILE"
+
+          # Read signatures
+          MAC_SIG=$(cat all-artifacts/*.app.tar.gz.sig 2>/dev/null || echo "")
+          LINUX_SIG=$(cat all-artifacts/*.AppImage.sig 2>/dev/null || echo "")
+          WIN_SIG=$(cat all-artifacts/*-setup.exe.sig 2>/dev/null || echo "")
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "Release ${GITHUB_REF_NAME}" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mac_url "${BASE_URL}/${MAC_FILE}" \
+            --arg mac_sig "$MAC_SIG" \
+            --arg linux_url "${BASE_URL}/${LINUX_FILE}" \
+            --arg linux_sig "$LINUX_SIG" \
+            --arg win_url "${BASE_URL}/${WIN_FILE}" \
+            --arg win_sig "$WIN_SIG" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { url: $mac_url, signature: $mac_sig },
+                "darwin-x86_64": { url: $mac_url, signature: $mac_sig },
+                "linux-x86_64": { url: $linux_url, signature: $linux_sig },
+                "windows-x86_64": { url: $win_url, signature: $win_sig }
+              }
+            }' > all-artifacts/latest.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VRCPulse ${{ github.ref_name }}
+          files: all-artifacts/*
+          generate_release_notes: true

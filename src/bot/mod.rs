@@ -44,7 +44,7 @@ pub async fn setup(config: &Config) -> Result<Client> {
 
     // 4. Start data collector in background
     let http_client = create_http_client();
-    tokio::spawn(collector::start(http_client, database, config_rx));
+    tokio::spawn(collector::start(http_client, database, config_rx, None));
 
     // 5. Configure Discord client
     let intents = GatewayIntents::GUILDS
