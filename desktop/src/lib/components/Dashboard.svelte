@@ -2,6 +2,7 @@
   import Chart from './Chart.svelte';
   import TimeRangeSelector from './TimeRangeSelector.svelte';
   import IncidentFeed from './IncidentFeed.svelte';
+  import PromoBanner from './PromoBanner.svelte';
   import { getDashboard, getIncidents } from '../api';
   import type { DashboardResponse, Incident } from '../types';
 
@@ -85,7 +86,8 @@
         <Chart
           data={dashboard?.metrics?.api_requests ?? null}
           title="API Requests"
-          unit="req/s"
+          unit="%"
+          hint="Normalized API request level relative to average capacity"
         />
       </div>
 
@@ -121,11 +123,13 @@
           color2="#a78bfa"
           title="Platform Share"
           unit="%"
+          hint="Percentage of total authentications by platform (Steam vs Meta/Oculus)"
         />
       </div>
     </div>
 
     <div class="sidebar">
+      <PromoBanner />
       <IncidentFeed {incidents} />
     </div>
   </div>
@@ -193,6 +197,9 @@
   .sidebar {
     width: 320px;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   @media (max-width: 1024px) {

@@ -15,9 +15,10 @@
     thresholdValue?: number;
     thresholdColor?: string;
     hero?: boolean;
+    hint?: string;
   }
 
-  let { data, label1, data2, label2, color2 = '#a78bfa', title, type: chartType = 'line', unit = '', thresholdValue, thresholdColor, hero = false }: Props = $props();
+  let { data, label1, data2, label2, color2 = '#a78bfa', title, type: chartType = 'line', unit = '', thresholdValue, thresholdColor, hero = false, hint = '' }: Props = $props();
 
   /** Dynamic precision: find enough decimals to show meaningful digits */
   function smartFormat(v: number, suffix: string = ''): string {
@@ -154,13 +155,23 @@
 
 <div class="chart-card" class:hero>
   <div class="chart-header">
-    <span class="chart-title">{title}</span>
-    {#if data && data.values.length > 0}
-      <span class="chart-value" style="color: #60a5fa">{formatHeaderValue(data.values[data.values.length - 1])}</span>
-    {/if}
-    {#if data2 && data2.values.length > 0}
-      <span class="chart-value" style="color: {color2}; margin-left: 8px; font-size: 16px">{formatHeaderValue(data2.values[data2.values.length - 1])}</span>
-    {/if}
+    <span class="chart-title">
+      {title}
+      {#if hint}
+        <span class="hint-wrap">
+          <span class="hint-icon">?</span>
+          <span class="hint-tooltip">{hint}</span>
+        </span>
+      {/if}
+    </span>
+    <span class="chart-values">
+      {#if data && data.values.length > 0}
+        <span class="chart-value" style="color: #60a5fa">{formatHeaderValue(data.values[data.values.length - 1])}</span>
+      {/if}
+      {#if data2 && data2.values.length > 0}
+        <span class="chart-value secondary" style="color: {color2}">{formatHeaderValue(data2.values[data2.values.length - 1])}</span>
+      {/if}
+    </span>
   </div>
   <div class="chart-container" bind:this={container}></div>
 </div>
@@ -181,6 +192,9 @@
   }
 
   .chart-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
     font-weight: 500;
     color: #71717a;
@@ -188,11 +202,71 @@
     letter-spacing: 0.05em;
   }
 
+  .hint-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .hint-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: 'Geist Mono', monospace;
+    color: #71717a;
+    border: 1px solid #71717a;
+    border-radius: 50%;
+    cursor: help;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .hint-wrap:hover .hint-icon {
+    color: #e4e4e7;
+    border-color: #e4e4e7;
+  }
+
+  .hint-tooltip {
+    display: none;
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 220px;
+    padding: 8px 10px;
+    background: #1a1d27;
+    border: 1px solid #2a2d37;
+    color: #a1a1aa;
+    font-size: 11px;
+    font-weight: 400;
+    font-family: 'Geist Sans', -apple-system, sans-serif;
+    line-height: 1.4;
+    text-transform: none;
+    letter-spacing: 0;
+    z-index: 10;
+  }
+
+  .hint-wrap:hover .hint-tooltip {
+    display: block;
+  }
+
+  .chart-values {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
   .chart-value {
     font-family: 'Geist Mono', monospace;
     font-size: 24px;
     font-weight: 700;
     color: #e4e4e7;
+  }
+
+  .chart-value.secondary {
+    font-size: 16px;
   }
 
   .chart-container {

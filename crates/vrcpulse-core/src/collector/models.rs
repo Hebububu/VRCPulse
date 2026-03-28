@@ -124,8 +124,8 @@ pub const CLOUDFRONT_METRICS: &[MetricDefinition] = &[
     MetricDefinition {
         endpoint: "/apirequests.json",
         name: "api_requests",
-        unit: "req/s",
-        scale: 1.0, // already requests per second
+        unit: "%",
+        scale: 100.0, // fraction → percentage (normalized API request level)
     },
     MetricDefinition {
         endpoint: "/apierrors.json",

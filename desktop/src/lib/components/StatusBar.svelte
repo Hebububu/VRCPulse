@@ -49,6 +49,8 @@
   <div class="left">
     <img src={logoImg} alt="VRCPulse" class="app-logo" />
     <span class="app-name">VRCPulse</span>
+    <span class="separator">|</span>
+    <span class="server-label">VRChat Server Status</span>
     <span class="status-dot" style="background: {statusColor}"></span>
     <span class="status-label" style="color: {statusColor}">{statusLabel}</span>
   </div>
@@ -84,6 +86,16 @@
     font-size: 16px;
     font-weight: 600;
     color: #e4e4e7;
+  }
+
+  .separator {
+    color: #2a2d37;
+    font-size: 16px;
+  }
+
+  .server-label {
+    font-size: 13px;
+    color: #71717a;
   }
 
   .status-dot {
