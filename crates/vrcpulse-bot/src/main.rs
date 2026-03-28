@@ -1,7 +1,6 @@
 mod alerts;
 mod audit;
 mod bot;
-mod collector;
 mod commands;
 mod config;
 mod database;
