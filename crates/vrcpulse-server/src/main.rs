@@ -67,6 +67,13 @@ async fn main() {
 
     info!("Database connected");
 
+    // Run migrations
+    use sea_orm_migration::MigratorTrait;
+    migration::Migrator::up(&database, None)
+        .await
+        .expect("Failed to run migrations");
+    info!("Migrations applied");
+
     // Start collector in background
     let (_config_tx, config_rx) = vrcpulse_core::collector::config::init(&database)
         .await
