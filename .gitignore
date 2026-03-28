@@ -7,3 +7,5 @@
 /output
 /examples
 .vscode
+node_modules
+/desktop/build
