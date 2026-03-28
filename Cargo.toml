@@ -2,6 +2,7 @@
 members = [
     "crates/vrcpulse-core",
     "crates/vrcpulse-bot",
+    "crates/vrcpulse-server",
     "desktop/src-tauri",
     "migration",
 ]
