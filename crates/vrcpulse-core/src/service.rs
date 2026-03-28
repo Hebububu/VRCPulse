@@ -348,7 +348,7 @@ impl VrcPulseService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Set};
+    use sea_orm::{ConnectionTrait, Database};
     use sea_orm_migration::MigratorTrait;
 
     async fn setup_test_db() -> DatabaseConnection {

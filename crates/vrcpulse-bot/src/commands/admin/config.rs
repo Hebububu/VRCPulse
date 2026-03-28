@@ -283,7 +283,7 @@ async fn handle_config_set<'a>(
         return respond_error(ctx, interaction, "Missing required options", "en").await;
     };
 
-    let Some(poller) = PollerType::from_str(poller_str) else {
+    let Some(poller) = PollerType::parse(poller_str) else {
         return respond_error(ctx, interaction, "Invalid poller type", "en").await;
     };
 
