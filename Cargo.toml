@@ -2,6 +2,7 @@
 members = [
     "crates/vrcpulse-core",
     "crates/vrcpulse-bot",
+    "desktop/src-tauri",
     "migration",
 ]
 resolver = "3"
