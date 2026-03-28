@@ -233,6 +233,7 @@ async fn delete_sent_alert(db: &DatabaseConnection, record_id: i64) {
 // Alert Sending
 // =============================================================================
 
+#[allow(clippy::too_many_arguments)]
 async fn send_guild_alert(
     ctx: &Context,
     db: &DatabaseConnection,
@@ -291,6 +292,7 @@ async fn send_guild_alert(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_user_alert(
     ctx: &Context,
     db: &DatabaseConnection,

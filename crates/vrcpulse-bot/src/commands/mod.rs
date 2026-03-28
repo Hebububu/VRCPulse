@@ -24,6 +24,7 @@ pub async fn register_global(ctx: &Context) -> Result<(), serenity::Error> {
 }
 
 /// Register slash commands to a specific guild (for development, instant update)
+#[allow(dead_code)]
 pub async fn register_guild(ctx: &Context, guild_id: u64) -> Result<(), serenity::Error> {
     let guild_id = serenity::all::GuildId::new(guild_id);
     let commands = guild_id.set_commands(&ctx.http, all()).await?;

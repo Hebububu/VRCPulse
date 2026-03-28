@@ -81,7 +81,7 @@ impl PollerType {
         ]
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "status" => Some(Self::Status),
             "incident" => Some(Self::Incident),

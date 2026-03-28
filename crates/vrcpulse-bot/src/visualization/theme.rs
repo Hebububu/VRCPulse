@@ -26,8 +26,6 @@ pub const ORANGE: RGBColor = RGBColor(0xF0, 0xB1, 0x32);
 
 /// Dashboard configuration
 pub const IMAGE_SIZE: u32 = 2400;
-pub const HOURS_RANGE: i64 = 12;
-pub const DOWNSAMPLE_MINUTES: i64 = 5;
 
 /// Font sizes (scaled for high resolution)
 pub const TITLE_FONT_SIZE: u32 = 48;

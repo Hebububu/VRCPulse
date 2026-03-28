@@ -16,6 +16,7 @@ impl serenity::prelude::TypeMapKey for AppStateKey {
 
 /// Application global state
 /// - Accessible via `TypeMap` in Serenity event handlers
+#[allow(dead_code)]
 pub struct AppState {
     /// Database connection
     pub database: Arc<DatabaseConnection>,

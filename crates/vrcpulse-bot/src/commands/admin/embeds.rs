@@ -48,6 +48,7 @@ pub fn config_reset(default_interval: u64) -> CreateEmbed {
 }
 
 /// Build embed for /admin show - bot info and command summary
+#[allow(clippy::too_many_arguments)]
 pub fn admin_show(
     version: &str,
     uptime: &str,

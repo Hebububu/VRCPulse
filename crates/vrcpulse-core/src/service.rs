@@ -259,8 +259,6 @@ impl VrcPulseService {
         &self,
         status_filter: &str,
     ) -> Result<IncidentsListResponse, sea_orm::DbErr> {
-        use sea_orm::QuerySelect;
-
         // Get latest snapshot per incident_id
         let snapshots = incident_snapshots::Entity::find()
             .order_by_desc(incident_snapshots::Column::FetchedAt)

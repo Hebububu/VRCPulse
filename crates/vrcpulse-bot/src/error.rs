@@ -17,7 +17,13 @@ pub enum AppError {
 
     /// Discord client error
     #[error("Discord error: {0}")]
-    Discord(#[from] serenity::Error),
+    Discord(#[from] Box<serenity::Error>),
+}
+
+impl From<serenity::Error> for AppError {
+    fn from(e: serenity::Error) -> Self {
+        AppError::Discord(Box::new(e))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;

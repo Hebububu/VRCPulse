@@ -1,10 +1,6 @@
-// Re-export core entities for convenience
+// Re-export core entities used by the bot
 pub use vrcpulse_core::entity::bot_config;
 pub use vrcpulse_core::entity::component_logs;
-pub use vrcpulse_core::entity::incident_updates;
-pub use vrcpulse_core::entity::incidents;
-pub use vrcpulse_core::entity::maintenances;
-pub use vrcpulse_core::entity::metric_logs;
 pub use vrcpulse_core::entity::status_logs;
 
 // Bot-specific entities

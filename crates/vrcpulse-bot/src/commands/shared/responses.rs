@@ -68,6 +68,7 @@ pub async fn respond_error(
 // =============================================================================
 
 /// Send an error response to a button interaction (updates the message)
+#[allow(dead_code)]
 pub async fn respond_button_error(
     ctx: &Context,
     interaction: &ComponentInteraction,
