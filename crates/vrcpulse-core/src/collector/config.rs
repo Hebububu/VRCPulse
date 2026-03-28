@@ -37,6 +37,7 @@ pub mod keys {
     pub const INCIDENT: &str = "polling.incident";
     pub const MAINTENANCE: &str = "polling.maintenance";
     pub const METRICS: &str = "polling.metrics";
+    pub const HISTORY: &str = "polling.history";
 }
 
 /// Poller type enum
@@ -46,6 +47,7 @@ pub enum PollerType {
     Incident,
     Maintenance,
     Metrics,
+    History,
 }
 
 impl PollerType {
@@ -55,6 +57,7 @@ impl PollerType {
             Self::Incident => "incident",
             Self::Maintenance => "maintenance",
             Self::Metrics => "metrics",
+            Self::History => "history",
         }
     }
 
@@ -64,6 +67,7 @@ impl PollerType {
             Self::Incident => keys::INCIDENT,
             Self::Maintenance => keys::MAINTENANCE,
             Self::Metrics => keys::METRICS,
+            Self::History => keys::HISTORY,
         }
     }
 
@@ -73,6 +77,7 @@ impl PollerType {
             Self::Incident,
             Self::Maintenance,
             Self::Metrics,
+            Self::History,
         ]
     }
 
@@ -82,6 +87,7 @@ impl PollerType {
             "incident" => Some(Self::Incident),
             "maintenance" => Some(Self::Maintenance),
             "metrics" => Some(Self::Metrics),
+            "history" => Some(Self::History),
             _ => None,
         }
     }
@@ -94,6 +100,7 @@ pub struct CollectorConfigTx {
     pub incident: watch::Sender<Duration>,
     pub maintenance: watch::Sender<Duration>,
     pub metrics: watch::Sender<Duration>,
+    pub history: watch::Sender<Duration>,
 }
 
 impl CollectorConfigTx {
@@ -104,6 +111,7 @@ impl CollectorConfigTx {
             PollerType::Incident => &self.incident,
             PollerType::Maintenance => &self.maintenance,
             PollerType::Metrics => &self.metrics,
+            PollerType::History => &self.history,
         }
     }
 
@@ -156,6 +164,7 @@ pub struct CollectorConfigRx {
     pub incident: watch::Receiver<Duration>,
     pub maintenance: watch::Receiver<Duration>,
     pub metrics: watch::Receiver<Duration>,
+    pub history: watch::Receiver<Duration>,
 }
 
 /// Create config channel pair and load initial values from database
@@ -166,18 +175,21 @@ pub async fn init(
     let incident_interval = load_interval(db, PollerType::Incident).await?;
     let maintenance_interval = load_interval(db, PollerType::Maintenance).await?;
     let metrics_interval = load_interval(db, PollerType::Metrics).await?;
+    let history_interval = load_interval(db, PollerType::History).await?;
 
     let (status_tx, status_rx) = watch::channel(Duration::from_secs(status_interval));
     let (incident_tx, incident_rx) = watch::channel(Duration::from_secs(incident_interval));
     let (maintenance_tx, maintenance_rx) =
         watch::channel(Duration::from_secs(maintenance_interval));
     let (metrics_tx, metrics_rx) = watch::channel(Duration::from_secs(metrics_interval));
+    let (history_tx, history_rx) = watch::channel(Duration::from_secs(history_interval));
 
     let tx = CollectorConfigTx {
         status: status_tx,
         incident: incident_tx,
         maintenance: maintenance_tx,
         metrics: metrics_tx,
+        history: history_tx,
     };
 
     let rx = CollectorConfigRx {
@@ -185,6 +197,7 @@ pub async fn init(
         incident: incident_rx,
         maintenance: maintenance_rx,
         metrics: metrics_rx,
+        history: history_rx,
     };
 
     info!(
@@ -192,6 +205,7 @@ pub async fn init(
         incident = incident_interval,
         maintenance = maintenance_interval,
         metrics = metrics_interval,
+        history = history_interval,
         "Loaded polling intervals from database"
     );
 

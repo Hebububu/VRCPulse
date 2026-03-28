@@ -34,13 +34,16 @@ pub struct Component {
     pub status: String,
 }
 
-/// Response from /incidents/unresolved.json
+/// Response from /incidents/unresolved.json and /incidents.json
 #[derive(Debug, Deserialize)]
 pub struct UnresolvedIncidentsResponse {
     pub incidents: Vec<Incident>,
 }
 
-#[derive(Debug, Deserialize)]
+/// Also used for /incidents.json (same shape)
+pub type IncidentsResponse = UnresolvedIncidentsResponse;
+
+#[derive(Debug, Deserialize, serde::Serialize)]
 pub struct Incident {
     pub id: String,
     pub name: String,
@@ -48,12 +51,14 @@ pub struct Incident {
     pub status: String,
     /// none | minor | major | critical
     pub impact: String,
+    pub started_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub resolved_at: Option<DateTime<Utc>>,
     pub incident_updates: Vec<IncidentUpdate>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, serde::Serialize)]
 pub struct IncidentUpdate {
     pub id: String,
     pub status: String,

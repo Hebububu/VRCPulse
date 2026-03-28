@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 
-use crate::entity::{incident_updates, incidents, maintenances, status_logs};
+use crate::entity::{incident_snapshots, incident_updates, incidents, maintenances, status_logs};
 use crate::query::{self, MetricData};
 
 /// Shared service layer used by both Tauri commands and Axum handlers.
@@ -65,6 +65,16 @@ pub struct MaintenanceResponse {
 #[derive(Debug, Serialize, Clone)]
 pub struct MaintenancesListResponse {
     pub maintenances: Vec<MaintenanceResponse>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct IncidentSnapshotResponse {
+    pub incident_id: String,
+    pub title: String,
+    pub impact: String,
+    pub status: String,
+    pub update_count: i32,
+    pub fetched_at: String,
 }
 
 fn hours_from_range(range: &str) -> i64 {
@@ -242,5 +252,97 @@ impl VrcPulseService {
                 })
                 .collect(),
         })
+    }
+
+    /// Get all incidents from snapshots (latest snapshot per incident)
+    pub async fn get_incidents_from_snapshots(
+        &self,
+        status_filter: &str,
+    ) -> Result<IncidentsListResponse, sea_orm::DbErr> {
+        use sea_orm::QuerySelect;
+
+        // Get latest snapshot per incident_id
+        let snapshots = incident_snapshots::Entity::find()
+            .order_by_desc(incident_snapshots::Column::FetchedAt)
+            .all(&self.db)
+            .await?;
+
+        // Deduplicate: keep only the latest snapshot per incident_id
+        let mut seen = std::collections::HashSet::new();
+        let mut unique: Vec<incident_snapshots::Model> = Vec::new();
+        for s in snapshots {
+            if seen.insert(s.incident_id.clone()) {
+                unique.push(s);
+            }
+        }
+
+        // Filter by status
+        let filtered: Vec<_> = if status_filter == "all" {
+            unique
+        } else {
+            unique
+                .into_iter()
+                .filter(|s| s.status == status_filter)
+                .collect()
+        };
+
+        let mut result = Vec::new();
+        for s in filtered {
+            // Parse updates from raw_json
+            let updates =
+                if let Ok(incident) = serde_json::from_str::<serde_json::Value>(&s.raw_json) {
+                    incident["incident_updates"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|u| {
+                                    Some(IncidentUpdateResponse {
+                                        status: u["status"].as_str()?.to_string(),
+                                        body: u["body"].as_str()?.to_string(),
+                                        created_at: u["created_at"].as_str()?.to_string(),
+                                    })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
+
+            result.push(IncidentResponse {
+                id: s.incident_id,
+                name: s.title,
+                status: s.status,
+                impact: s.impact,
+                created_at: s.started_at.to_rfc3339(),
+                updates,
+            });
+        }
+
+        Ok(IncidentsListResponse { incidents: result })
+    }
+
+    /// Get snapshot history for a specific incident
+    pub async fn get_incident_history(
+        &self,
+        incident_id: &str,
+    ) -> Result<Vec<IncidentSnapshotResponse>, sea_orm::DbErr> {
+        let snapshots = incident_snapshots::Entity::find()
+            .filter(incident_snapshots::Column::IncidentId.eq(incident_id))
+            .order_by_asc(incident_snapshots::Column::FetchedAt)
+            .all(&self.db)
+            .await?;
+
+        Ok(snapshots
+            .into_iter()
+            .map(|s| IncidentSnapshotResponse {
+                incident_id: s.incident_id,
+                title: s.title,
+                impact: s.impact,
+                status: s.status,
+                update_count: s.update_count,
+                fetched_at: s.fetched_at.to_rfc3339(),
+            })
+            .collect())
     }
 }

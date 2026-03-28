@@ -6743,6 +6743,7 @@ dependencies = [
  "reqwest 0.13.1",
  "sea-orm",
  "serde",
+ "serde_json",
  "thiserror 2.0.17",
  "tokio",
  "tracing",

@@ -102,6 +102,10 @@ async fn main() {
         .route("/metrics/dashboard", get(get_dashboard))
         .route("/metrics/{name}", get(get_metrics))
         .route("/incidents", get(get_incidents))
+        .route(
+            "/incidents/history/{incident_id}",
+            get(get_incident_history),
+        )
         .route("/maintenances", get(get_maintenances));
 
     let app = Router::new()
@@ -162,8 +166,18 @@ async fn get_incidents(
     State(state): State<Arc<AppState>>,
     Query(params): Query<StatusFilterQuery>,
 ) -> impl IntoResponse {
-    let status = params.status.as_deref().unwrap_or("active");
-    match state.service.get_incidents(status).await {
+    let status = params.status.as_deref().unwrap_or("all");
+    match state.service.get_incidents_from_snapshots(status).await {
+        Ok(data) => Json(data).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_incident_history(
+    State(state): State<Arc<AppState>>,
+    Path(incident_id): Path<String>,
+) -> impl IntoResponse {
+    match state.service.get_incident_history(&incident_id).await {
         Ok(data) => Json(data).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }

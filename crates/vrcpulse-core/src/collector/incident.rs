@@ -2,13 +2,36 @@ use std::collections::HashSet;
 
 use chrono::Utc;
 use reqwest::Client;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 use tracing::{debug, info, warn};
 
-use crate::entity::{incident_updates, incidents};
+use crate::entity::{incident_snapshots, incident_updates, incidents};
 
 use super::client::{Result, fetch_json, status_api_url};
-use super::models::UnresolvedIncidentsResponse;
+use super::models::{IncidentsResponse, UnresolvedIncidentsResponse};
+
+/// Change events detected during history polling
+#[derive(Debug)]
+pub enum IncidentChange {
+    New {
+        incident_id: String,
+        title: String,
+        impact: String,
+    },
+    StatusChanged {
+        incident_id: String,
+        title: String,
+        old_status: String,
+        new_status: String,
+    },
+    UpdateAdded {
+        incident_id: String,
+        title: String,
+        new_update_count: i32,
+    },
+}
 
 /// Poll /incidents/unresolved.json and handle incident resolution detection
 pub async fn poll(client: &Client, db: &DatabaseConnection) -> Result<()> {
@@ -100,6 +123,82 @@ async fn upsert_incident(
     }
 
     Ok(())
+}
+
+/// Poll /incidents.json for full history with snapshot storage
+pub async fn poll_history(client: &Client, db: &DatabaseConnection) -> Result<Vec<IncidentChange>> {
+    let url = status_api_url("/incidents.json");
+    let response: IncidentsResponse = fetch_json(client, &url).await?;
+
+    let now = Utc::now();
+    let mut changes = Vec::new();
+
+    for incident in &response.incidents {
+        let update_count = incident.incident_updates.len() as i32;
+        let raw_json = serde_json::to_string(incident).unwrap_or_else(|_| "{}".to_string());
+
+        // Find latest snapshot for this incident
+        let prev = incident_snapshots::Entity::find()
+            .filter(incident_snapshots::Column::IncidentId.eq(&incident.id))
+            .order_by_desc(incident_snapshots::Column::FetchedAt)
+            .one(db)
+            .await?;
+
+        let changed = match &prev {
+            None => {
+                changes.push(IncidentChange::New {
+                    incident_id: incident.id.clone(),
+                    title: incident.name.clone(),
+                    impact: incident.impact.clone(),
+                });
+                true
+            }
+            Some(prev) => {
+                let mut did_change = false;
+                if prev.status != incident.status {
+                    changes.push(IncidentChange::StatusChanged {
+                        incident_id: incident.id.clone(),
+                        title: incident.name.clone(),
+                        old_status: prev.status.clone(),
+                        new_status: incident.status.clone(),
+                    });
+                    did_change = true;
+                }
+                if prev.update_count != update_count {
+                    changes.push(IncidentChange::UpdateAdded {
+                        incident_id: incident.id.clone(),
+                        title: incident.name.clone(),
+                        new_update_count: update_count,
+                    });
+                    did_change = true;
+                }
+                did_change
+            }
+        };
+
+        if changed {
+            let active = incident_snapshots::ActiveModel {
+                incident_id: Set(incident.id.clone()),
+                title: Set(incident.name.clone()),
+                impact: Set(incident.impact.clone()),
+                status: Set(incident.status.clone()),
+                started_at: Set(incident.started_at),
+                resolved_at: Set(incident.resolved_at),
+                update_count: Set(update_count),
+                raw_json: Set(raw_json),
+                fetched_at: Set(now),
+                ..Default::default()
+            };
+            active.insert(db).await?;
+            debug!(incident_id = %incident.id, "Saved incident snapshot");
+        }
+    }
+
+    if !changes.is_empty() {
+        info!(count = changes.len(), "Incident changes detected");
+    }
+
+    Ok(changes)
 }
 
 async fn upsert_incident_update(

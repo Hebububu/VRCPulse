@@ -24,6 +24,7 @@ pub async fn start(client: Client, db: DatabaseConnection, config: CollectorConf
         incident = config.incident.borrow().as_secs(),
         maintenance = config.maintenance.borrow().as_secs(),
         metrics = config.metrics.borrow().as_secs(),
+        history = config.history.borrow().as_secs(),
         "Polling intervals (seconds)"
     );
 
@@ -39,6 +40,10 @@ pub async fn start(client: Client, db: DatabaseConnection, config: CollectorConf
         }),
         poll_loop_dynamic("metrics", config.metrics.clone(), || {
             metrics::poll(&client, &db)
+        }),
+        poll_loop_dynamic("history", config.history.clone(), || async {
+            let _changes = incident::poll_history(&client, &db).await?;
+            Ok(())
         }),
     );
 }
