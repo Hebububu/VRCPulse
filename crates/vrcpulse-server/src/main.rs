@@ -99,14 +99,16 @@ async fn main() {
 
     let app = Router::new()
         .nest("/api", api_routes)
-        .fallback_service(ServeDir::new("static").fallback(
-            get(|| async {
-                match tokio::fs::read_to_string("static/index.html").await {
-                    Ok(html) => axum::response::Html(html).into_response(),
-                    Err(_) => (StatusCode::OK, "VRCPulse Server is running. No static files found.").into_response(),
-                }
-            }),
-        ))
+        .fallback_service(ServeDir::new("static").fallback(get(|| async {
+            match tokio::fs::read_to_string("static/index.html").await {
+                Ok(html) => axum::response::Html(html).into_response(),
+                Err(_) => (
+                    StatusCode::OK,
+                    "VRCPulse Server is running. No static files found.",
+                )
+                    .into_response(),
+            }
+        })))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

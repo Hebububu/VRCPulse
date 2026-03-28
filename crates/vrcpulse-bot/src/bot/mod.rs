@@ -13,10 +13,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use vrcpulse_core::collector;
 use crate::config::Config;
 use crate::error::Result;
 use crate::state::{AppState, AppStateKey};
+use vrcpulse_core::collector;
 
 /// Set up and configure the Discord bot client
 ///

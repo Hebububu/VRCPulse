@@ -145,10 +145,7 @@ impl VrcPulseService {
         Ok(metric_data_to_response(name, final_data))
     }
 
-    pub async fn get_dashboard(
-        &self,
-        range: &str,
-    ) -> Result<DashboardResponse, sea_orm::DbErr> {
+    pub async fn get_dashboard(&self, range: &str) -> Result<DashboardResponse, sea_orm::DbErr> {
         let metric_names = [
             "online_users",
             "api_latency",
@@ -173,8 +170,7 @@ impl VrcPulseService {
         &self,
         status_filter: &str,
     ) -> Result<IncidentsListResponse, sea_orm::DbErr> {
-        let mut query = incidents::Entity::find()
-            .order_by_desc(incidents::Column::StartedAt);
+        let mut query = incidents::Entity::find().order_by_desc(incidents::Column::StartedAt);
 
         if status_filter != "all" {
             query = query.filter(incidents::Column::Status.eq(status_filter));
@@ -214,8 +210,8 @@ impl VrcPulseService {
         &self,
         status_filter: &str,
     ) -> Result<MaintenancesListResponse, sea_orm::DbErr> {
-        let mut query = maintenances::Entity::find()
-            .order_by_desc(maintenances::Column::ScheduledFor);
+        let mut query =
+            maintenances::Entity::find().order_by_desc(maintenances::Column::ScheduledFor);
 
         if status_filter != "all" {
             query = query.filter(maintenances::Column::Status.eq(status_filter));
