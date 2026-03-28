@@ -1,18 +1,24 @@
 import type { DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, MaintenancesListResponse } from './types';
 
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+function getApiBase(): string {
+  if (typeof window === 'undefined') return 'http://localhost:3000/api';
 
-const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : '/api';
-
-async function fetchApi<T>(path: string): Promise<T> {
-  if (isTauri) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    // For now, fall back to HTTP even in Tauri (commands will be wired later)
-    // return invoke(command, args);
+  // Tauri app: use the deployed web server API
+  if ('__TAURI_INTERNALS__' in window) {
+    return 'https://vrcpulse.vrcdevs.com/api';
   }
 
+  // Web: localhost dev or same-origin production
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:3000/api';
+  }
+
+  return '/api';
+}
+
+const API_BASE = getApiBase();
+
+async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();

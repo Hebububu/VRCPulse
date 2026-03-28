@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+  import { t } from '../i18n';
   import type { Incident } from '../types';
 
   interface Props {
@@ -41,12 +42,12 @@
 
 <div class="feed">
   <div class="feed-header">
-    <h3 class="feed-title">Recent Incidents</h3>
-    <button class="view-all" onclick={() => push('/incidents')}>View All</button>
+    <h3 class="feed-title">{t('incidents.recent')}</h3>
+    <button class="view-all" onclick={() => push('/incidents')}>{t('incidents.viewAll')}</button>
   </div>
 
   {#if recent.length === 0}
-    <div class="empty">No incidents recorded</div>
+    <div class="empty">{t('incidents.noRecords')}</div>
   {:else}
     {#each recent as incident}
       <button class="incident" onclick={() => push(`/incidents/${incident.id}`)}>

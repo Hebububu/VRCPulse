@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+  import { t } from '../i18n';
   import { getIncidents, getIncidentHistory } from '../api';
   import type { Incident, IncidentSnapshotResponse } from '../types';
 
@@ -84,7 +85,7 @@
 
 <div class="page">
   <div class="page-header">
-    <button class="back-btn" onclick={() => push('/incidents')}>← Incidents</button>
+    <button class="back-btn" onclick={() => push('/incidents')}>{t('nav.incidents')}</button>
   </div>
 
   {#if error}
@@ -108,12 +109,12 @@
         {/if}
       </div>
       <button class="source-link" onclick={handleOpenLink}>
-        View on status.vrchat.com →
+        {t('incidents.viewSource')} →
       </button>
     </div>
 
     <div class="section">
-      <h2>Updates</h2>
+      <h2>{t('incidents.updates')}</h2>
       {#if incident.updates.length === 0}
         <p class="empty">No updates yet</p>
       {:else}
@@ -136,7 +137,7 @@
 
     {#if history.length > 1}
       <div class="section">
-        <h2>Change History</h2>
+        <h2>{t('incidents.changeHistory')}</h2>
         <div class="history-table">
           <div class="history-header">
             <span>Time</span>
@@ -161,8 +162,10 @@
 <style>
   .page {
     padding: 24px;
-    max-width: 800px;
+    width: 100%;
+    max-width: 900px;
     margin: 0 auto;
+    min-height: calc(100vh - 56px);
   }
 
   .page-header {

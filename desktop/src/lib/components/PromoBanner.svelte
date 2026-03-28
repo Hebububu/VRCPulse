@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { t } from '../i18n';
 
   let showDownload = $state(true);
 
@@ -20,8 +21,8 @@
         </svg>
       </div>
       <div class="card-text">
-        <span class="card-title">Get Discord Alerts</span>
-        <span class="card-desc">Add bot to your server</span>
+        <span class="card-title">{t('promo.discord')}</span>
+        <span class="card-desc">{t('promo.discordDesc')}</span>
       </div>
       <span class="card-arrow">→</span>
     </a>
@@ -36,8 +37,8 @@
         </svg>
       </div>
       <div class="card-text">
-        <span class="card-title">Desktop App</span>
-        <span class="card-desc">System tray + notifications</span>
+        <span class="card-title">{t('promo.desktop')}</span>
+        <span class="card-desc">{t('promo.desktopDesc')}</span>
       </div>
       <span class="card-arrow">→</span>
     </a>

@@ -4,6 +4,7 @@
   import IncidentFeed from './IncidentFeed.svelte';
   import PromoBanner from './PromoBanner.svelte';
   import { getDashboard, getIncidents } from '../api';
+  import { t } from '../i18n';
   import type { DashboardResponse, Incident } from '../types';
 
   interface Props {
@@ -70,7 +71,7 @@
     <div class="charts-area">
       <Chart
         data={dashboard?.metrics?.online_users ?? null}
-        title="Online Users"
+        title={t('chart.onlineUsers')}
         type="area"
         hero={true}
       />
@@ -78,23 +79,23 @@
       <div class="chart-grid">
         <Chart
           data={dashboard?.metrics?.api_latency ?? null}
-          title="API Latency"
+          title={t('chart.apiLatency')}
           unit="ms"
           thresholdValue={500}
           thresholdColor="#eab308"
         />
         <Chart
           data={dashboard?.metrics?.api_requests ?? null}
-          title="API Requests"
+          title={t('chart.apiRequests')}
           unit="%"
-          hint="Normalized API request level relative to average capacity"
+          hint={t('chart.hint.apiRequests')}
         />
       </div>
 
       <div class="chart-grid">
         <Chart
           data={dashboard?.metrics?.api_error_rate ?? null}
-          title="Error Rate"
+          title={t('chart.errorRate')}
           type="area"
           unit="%"
           thresholdValue={5}
@@ -102,7 +103,7 @@
         />
         <Chart
           data={dashboard?.metrics?.steam_auth ?? null}
-          title="Steam Auth Success"
+          title={t('chart.steamAuth')}
           type="area"
           unit="%"
         />
@@ -111,7 +112,7 @@
       <div class="chart-grid">
         <Chart
           data={dashboard?.metrics?.meta_auth ?? null}
-          title="Meta Auth Success"
+          title={t('chart.metaAuth')}
           type="area"
           unit="%"
         />
@@ -121,9 +122,9 @@
           data2={dashboard?.metrics?.meta_share ?? null}
           label2="Meta"
           color2="#a78bfa"
-          title="Platform Share"
+          title={t('chart.platformShare')}
           unit="%"
-          hint="Percentage of total authentications by platform (Steam vs Meta/Oculus)"
+          hint={t('chart.hint.platformShare')}
         />
       </div>
     </div>

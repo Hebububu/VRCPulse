@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+  import { t } from '../i18n';
   import { getIncidents } from '../api';
   import type { Incident } from '../types';
 
@@ -56,8 +57,8 @@
 
 <div class="page">
   <div class="page-header">
-    <button class="back-btn" onclick={() => push('/')}>← Dashboard</button>
-    <h1>Incident History</h1>
+    <button class="back-btn" onclick={() => push('/')}>{t('nav.dashboard')}</button>
+    <h1>{t('incidents.history')}</h1>
   </div>
 
   <div class="filters">
@@ -102,8 +103,10 @@
 <style>
   .page {
     padding: 24px;
+    width: 100%;
     max-width: 900px;
     margin: 0 auto;
+    min-height: calc(100vh - 56px);
   }
 
   .page-header {

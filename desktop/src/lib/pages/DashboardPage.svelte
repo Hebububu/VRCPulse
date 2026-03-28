@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import StatusBar from '../components/StatusBar.svelte';
   import Dashboard from '../components/Dashboard.svelte';
+  import { t } from '../i18n';
   import type { StatusResponse } from '../types';
 
   let status: StatusResponse | null = $state(null);
@@ -53,12 +54,12 @@
 
 {#if updateAvailable}
   <div class="update-bar">
-    <span>VRCPulse {updateAvailable.version} is available</span>
+    <span>VRCPulse {updateAvailable.version} {t('update.available')}</span>
     <div class="update-actions">
       <button class="update-btn" onclick={doUpdate} disabled={updating}>
-        {updating ? 'Updating...' : 'Update Now'}
+        {updating ? t('update.updating') : t('update.now')}
       </button>
-      <button class="dismiss-btn" onclick={dismissUpdate}>Later</button>
+      <button class="dismiss-btn" onclick={dismissUpdate}>{t('update.later')}</button>
     </div>
   </div>
 {/if}

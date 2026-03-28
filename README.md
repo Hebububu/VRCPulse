@@ -80,6 +80,8 @@ Visit [vrcdevs.com](https://vrcdevs.com)
 ### Download Desktop App
 [Latest Release](https://github.com/Hebububu/VRCPulse/releases/latest) - macOS (.dmg), Windows (.exe), Linux (.deb, .rpm, .AppImage)
 
+> **macOS**: After installing, run `xattr -cr /Applications/VRCPulse.app` in Terminal to bypass Gatekeeper (unsigned app).
+
 ### Add Discord Bot
 [Add to Discord](https://discord.com/oauth2/authorize?client_id=1456912795462275166&permissions=49152&scope=bot%20applications.commands)
 
