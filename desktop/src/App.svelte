@@ -1,78 +1,43 @@
 <script lang="ts">
-  import { invoke } from '@tauri-apps/api/core';
+  import StatusBar from './lib/components/StatusBar.svelte';
+  import Dashboard from './lib/components/Dashboard.svelte';
+  import type { StatusResponse } from './lib/types';
 
-  let greeting = $state('');
+  let status: StatusResponse | null = $state(null);
+  let lastUpdated: Date | null = $state(null);
 
-  async function greet() {
-    greeting = await invoke('greet', { name: 'VRChat' });
+  function handleStatusUpdate(newStatus: StatusResponse) {
+    status = newStatus;
+    lastUpdated = new Date();
   }
 
-  greet();
+  function handleDataReceived() {
+    lastUpdated = new Date();
+  }
 </script>
 
 <main>
-  <div class="status-bar">
-    <span class="app-name">VRCPulse</span>
-    <span class="status-text">Connecting...</span>
-  </div>
-
-  <div class="content">
-    <p class="greeting">{greeting || 'Loading...'}</p>
-    <p class="subtitle">Desktop + Web dashboard coming soon</p>
-  </div>
+  <StatusBar {status} {lastUpdated} />
+  <Dashboard onStatusUpdate={handleStatusUpdate} onDataReceived={handleDataReceived} />
 </main>
 
 <style>
-  :global(body) {
+  :global(*) {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
+  }
+
+  :global(body) {
     background: #0f1117;
     color: #e4e4e7;
-    font-family: 'Geist Sans', -apple-system, sans-serif;
+    font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   main {
-    min-height: 100vh;
-  }
-
-  .status-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 56px;
-    padding: 0 16px;
-    background: #1a1d27;
-    border-bottom: 1px solid #2a2d37;
-  }
-
-  .app-name {
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .status-text {
-    font-size: 14px;
-    color: #71717a;
-  }
-
-  .content {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 56px);
-    gap: 8px;
-  }
-
-  .greeting {
-    font-family: 'Geist Mono', monospace;
-    font-size: 20px;
-    font-weight: 600;
-    color: #60a5fa;
-  }
-
-  .subtitle {
-    font-size: 14px;
-    color: #71717a;
+    min-height: 100vh;
   }
 </style>
