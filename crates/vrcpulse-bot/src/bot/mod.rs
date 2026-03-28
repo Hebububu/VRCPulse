@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::collector;
+use vrcpulse_core::collector;
 use crate::config::Config;
 use crate::error::Result;
 use crate::state::{AppState, AppStateKey};

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::collector::CollectorConfigTx;
+use vrcpulse_core::CollectorConfigTx;
 
 /// TypeMap key for AppState access
 pub struct AppStateKey;

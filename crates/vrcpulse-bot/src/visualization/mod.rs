@@ -4,7 +4,9 @@
 //! stored in SQLite, for embedding in Discord messages.
 
 pub mod dashboard;
-pub mod query;
 pub mod theme;
+
+// Re-export query from core
+pub use vrcpulse_core::query;
 
 pub use dashboard::generate_dashboard;

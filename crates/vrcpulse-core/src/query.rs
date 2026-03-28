@@ -6,7 +6,11 @@ use chrono::{DateTime, Duration, Utc};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::entity::metric_logs;
-use crate::visualization::theme::{DOWNSAMPLE_MINUTES, HOURS_RANGE};
+
+/// Default time range in hours for metric queries
+pub const DEFAULT_HOURS_RANGE: i64 = 12;
+/// Default downsampling interval in minutes
+pub const DEFAULT_DOWNSAMPLE_MINUTES: i64 = 5;
 
 /// Metric data for chart rendering
 #[derive(Debug, Clone)]
@@ -42,7 +46,7 @@ pub async fn load_metric(
     db: &DatabaseConnection,
     metric_name: &str,
 ) -> Result<MetricData, sea_orm::DbErr> {
-    let cutoff = Utc::now() - Duration::hours(HOURS_RANGE);
+    let cutoff = Utc::now() - Duration::hours(DEFAULT_HOURS_RANGE);
 
     let data: Vec<metric_logs::Model> = metric_logs::Entity::find()
         .filter(metric_logs::Column::MetricName.eq(metric_name))
@@ -68,7 +72,7 @@ pub fn downsample(data: MetricData) -> MetricData {
         return data;
     }
 
-    let interval = Duration::minutes(DOWNSAMPLE_MINUTES);
+    let interval = Duration::minutes(DEFAULT_DOWNSAMPLE_MINUTES);
     let mut downsampled_timestamps = Vec::new();
     let mut downsampled_values = Vec::new();
 

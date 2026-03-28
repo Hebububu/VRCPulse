@@ -7,7 +7,7 @@ use serenity::all::{
 };
 use tracing::error;
 
-use crate::collector::config::{DEFAULT_INTERVAL, PollerType, get_interval, validate_interval};
+use vrcpulse_core::collector::config::{DEFAULT_INTERVAL, PollerType, get_interval, validate_interval};
 use crate::commands::shared::respond_error;
 use crate::database;
 use crate::repository::{GuildConfigRepository, UserConfigRepository};
@@ -291,7 +291,7 @@ async fn handle_config_set<'a>(
     }
 
     // Update interval in database
-    if let Err(e) = crate::collector::config::set_interval(db, poller, seconds).await {
+    if let Err(e) = vrcpulse_core::collector::config::set_interval(db, poller, seconds).await {
         error!(error = %e, "Failed to update polling interval");
         return respond_error(ctx, interaction, "Failed to save configuration", "en").await;
     }
@@ -312,7 +312,7 @@ async fn handle_config_reset(
 ) -> Result<(), serenity::Error> {
     // Reset all pollers to default
     for poller in PollerType::all() {
-        if let Err(e) = crate::collector::config::set_interval(db, *poller, DEFAULT_INTERVAL).await
+        if let Err(e) = vrcpulse_core::collector::config::set_interval(db, *poller, DEFAULT_INTERVAL).await
         {
             error!(error = %e, poller = ?poller, "Failed to reset polling interval");
             return respond_error(ctx, interaction, "Failed to reset configuration", "en").await;

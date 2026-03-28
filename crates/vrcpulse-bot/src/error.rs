@@ -1,8 +1,12 @@
 use thiserror::Error;
 
-/// Application error types
+/// Bot-specific error types
 #[derive(Debug, Error)]
 pub enum AppError {
+    /// Core library error
+    #[error("{0}")]
+    Core(#[from] vrcpulse_core::CoreError),
+
     /// Failed to load environment variables
     #[error("Failed to load config: {0}")]
     Config(#[from] envy::Error),
