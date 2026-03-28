@@ -131,3 +131,94 @@ pub async fn load_metric_as_percent(
     let data = load_metric(db, metric_name).await?;
     Ok(to_percent(downsample(data)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn make_data(values: Vec<f64>, minutes_apart: i64) -> MetricData {
+        let base = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let timestamps = values
+            .iter()
+            .enumerate()
+            .map(|(i, _)| base + Duration::minutes(i as i64 * minutes_apart))
+            .collect();
+        MetricData {
+            timestamps,
+            values,
+            unit: "count".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_downsample_empty() {
+        let data = MetricData {
+            timestamps: vec![],
+            values: vec![],
+            unit: "count".to_string(),
+        };
+        let result = downsample(data);
+        assert!(result.values.is_empty());
+        assert!(result.timestamps.is_empty());
+    }
+
+    #[test]
+    fn test_downsample_single_point() {
+        let data = make_data(vec![42.0], 1);
+        let result = downsample(data);
+        assert_eq!(result.values.len(), 1);
+        assert_eq!(result.values[0], 42.0);
+    }
+
+    #[test]
+    fn test_downsample_multiple_points() {
+        // 10 points, 1 minute apart. DEFAULT_DOWNSAMPLE_MINUTES=5, so should produce 2 buckets.
+        let data = make_data(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], 1);
+        let result = downsample(data);
+        assert_eq!(result.values.len(), 2);
+        // First bucket: avg(1,2,3,4,5) = 3.0
+        assert!((result.values[0] - 3.0).abs() < 0.01);
+        // Second bucket: avg(6,7,8,9,10) = 8.0
+        assert!((result.values[1] - 8.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_to_percent() {
+        let data = make_data(vec![0.0, 0.5, 1.0], 1);
+        let result = to_percent(data);
+        assert_eq!(result.values, vec![0.0, 50.0, 100.0]);
+    }
+
+    #[test]
+    fn test_metric_data_is_empty() {
+        let empty = MetricData {
+            timestamps: vec![],
+            values: vec![],
+            unit: String::new(),
+        };
+        assert!(empty.is_empty());
+
+        let non_empty = make_data(vec![1.0], 1);
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_metric_data_avg() {
+        let empty = MetricData {
+            timestamps: vec![],
+            values: vec![],
+            unit: String::new(),
+        };
+        assert_eq!(empty.avg(), 0.0);
+
+        let data = make_data(vec![10.0, 20.0, 30.0], 1);
+        assert!((data.avg() - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_metric_data_max() {
+        let data = make_data(vec![5.0, 15.0, 10.0], 1);
+        assert_eq!(data.max(), 15.0);
+    }
+}

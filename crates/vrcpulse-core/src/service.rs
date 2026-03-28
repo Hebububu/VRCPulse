@@ -346,3 +346,85 @@ impl VrcPulseService {
             .collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Set};
+    use sea_orm_migration::MigratorTrait;
+
+    async fn setup_test_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect to in-memory SQLite");
+        migration::Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+        db
+    }
+
+    #[tokio::test]
+    async fn test_get_status_empty_db() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let status = service.get_status().await.unwrap();
+        assert_eq!(status.indicator, "none");
+        assert_eq!(status.description, "No status data yet");
+    }
+
+    #[tokio::test]
+    async fn test_get_status_with_data() {
+        let db = setup_test_db().await;
+        db.execute_unprepared(
+            "INSERT INTO status_logs (indicator, description, source_timestamp, created_at) \
+             VALUES ('minor', 'Partial outage', datetime('now'), datetime('now'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let status = service.get_status().await.unwrap();
+        assert_eq!(status.indicator, "minor");
+        assert_eq!(status.description, "Partial outage");
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_empty() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let result = service.get_metrics("online_users", "1h").await.unwrap();
+        assert!(result.timestamps.is_empty());
+        assert!(result.values.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_dashboard_returns_all_keys() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let dashboard = service.get_dashboard("1h").await.unwrap();
+        let keys: Vec<&String> = dashboard.metrics.keys().collect();
+        assert!(keys.len() >= 8);
+        assert!(dashboard.metrics.contains_key("online_users"));
+        assert!(dashboard.metrics.contains_key("api_latency"));
+        assert!(dashboard.metrics.contains_key("steam_auth"));
+        assert!(dashboard.metrics.contains_key("steam_share"));
+    }
+
+    #[tokio::test]
+    async fn test_get_incidents_from_snapshots_empty() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let result = service.get_incidents_from_snapshots("all").await.unwrap();
+        assert!(result.incidents.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_db_metric() {
+        assert_eq!(resolve_db_metric("online_users"), "visits");
+        assert_eq!(resolve_db_metric("api_error_rate"), "api_errors");
+        assert_eq!(resolve_db_metric("steam_auth"), "extauth_steam");
+        assert_eq!(resolve_db_metric("meta_auth"), "extauth_oculus");
+        assert_eq!(resolve_db_metric("api_latency"), "api_latency");
+        assert_eq!(resolve_db_metric("unknown"), "unknown");
+    }
+}
