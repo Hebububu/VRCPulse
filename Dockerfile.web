@@ -1,0 +1,73 @@
+# ==============================================================================
+# VRCPulse Web Server - Production Dockerfile
+# ==============================================================================
+
+# Stage 1: Build frontend
+FROM node:22-slim AS frontend
+
+WORKDIR /app/desktop
+COPY desktop/package.json desktop/package-lock.json ./
+RUN npm ci
+COPY desktop/ ./
+RUN npm run build
+
+# Stage 2: Build Rust server
+FROM rust:1.91-slim-bookworm AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifests for dependency caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates/vrcpulse-core/Cargo.toml crates/vrcpulse-core/
+COPY crates/vrcpulse-server/Cargo.toml crates/vrcpulse-server/
+COPY crates/vrcpulse-bot/Cargo.toml crates/vrcpulse-bot/
+COPY desktop/src-tauri/Cargo.toml desktop/src-tauri/
+COPY migration/Cargo.toml migration/
+
+# Create dummy files to build dependencies
+RUN mkdir -p crates/vrcpulse-core/src && echo "pub fn dummy() {}" > crates/vrcpulse-core/src/lib.rs \
+    && mkdir -p crates/vrcpulse-server/src && echo "fn main() {}" > crates/vrcpulse-server/src/main.rs \
+    && mkdir -p crates/vrcpulse-bot/src && echo "fn main() {}" > crates/vrcpulse-bot/src/main.rs \
+    && mkdir -p desktop/src-tauri/src && echo "pub fn run() {}" > desktop/src-tauri/src/lib.rs && echo "fn main() {}" > desktop/src-tauri/src/main.rs \
+    && mkdir -p migration/src && echo "" > migration/src/lib.rs
+
+RUN cargo build --release -p vrcpulse-server 2>/dev/null || true
+RUN rm -rf crates/ migration/src desktop/src-tauri/src
+
+# Copy actual source
+COPY crates/ ./crates/
+COPY migration/src ./migration/src
+COPY desktop/src-tauri/src ./desktop/src-tauri/src
+
+RUN touch crates/vrcpulse-server/src/main.rs
+RUN cargo build --release -p vrcpulse-server
+
+# Stage 3: Runtime
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/vrcpulse-server ./vrcpulse-server
+COPY --from=frontend /app/desktop/build ./static
+
+RUN mkdir -p /data
+
+ENV DATABASE_URL=sqlite:///data/vrcpulse.db?mode=rwc
+ENV PORT=80
+ENV RUST_LOG=info,vrcpulse=info
+
+VOLUME ["/data"]
+EXPOSE 80
+
+CMD ["./vrcpulse-server"]
