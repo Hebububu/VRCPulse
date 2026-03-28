@@ -15,6 +15,22 @@
 
   let { data, title, type: chartType = 'line', unit = '', thresholdValue, thresholdColor, hero = false }: Props = $props();
 
+  function formatHeaderValue(v: number): string {
+    if (unit === '%') {
+      if (v < 0.01) return `${v.toFixed(3)}%`;
+      if (v < 1) return `${v.toFixed(2)}%`;
+      return `${v.toFixed(1)}%`;
+    }
+    if (unit === 'ms') {
+      if (v < 1) return `${v.toFixed(3)}ms`;
+      if (v < 10) return `${v.toFixed(1)}ms`;
+      return `${v.toFixed(0)}ms`;
+    }
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+    if (v < 1) return v.toFixed(3);
+    return v.toFixed(0);
+  }
+
   let container: HTMLDivElement;
   let chart: echarts.ECharts | null = null;
 
@@ -51,9 +67,18 @@
     const values = data.values;
 
     const formatValue = (v: number) => {
-      if (unit === '%') return `${v.toFixed(1)}%`;
-      if (unit === 'ms') return `${v.toFixed(0)}ms`;
+      if (unit === '%') {
+        if (v < 0.01) return `${v.toFixed(3)}%`;
+        if (v < 1) return `${v.toFixed(2)}%`;
+        return `${v.toFixed(1)}%`;
+      }
+      if (unit === 'ms') {
+        if (v < 1) return `${v.toFixed(3)}ms`;
+        if (v < 10) return `${v.toFixed(1)}ms`;
+        return `${v.toFixed(0)}ms`;
+      }
       if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+      if (v < 1) return v.toFixed(3);
       return v.toFixed(0);
     };
 
@@ -114,17 +139,7 @@
   <div class="chart-header">
     <span class="chart-title">{title}</span>
     {#if data && data.values.length > 0}
-      <span class="chart-value">
-        {#if unit === '%'}
-          {data.values[data.values.length - 1].toFixed(1)}%
-        {:else if unit === 'ms'}
-          {data.values[data.values.length - 1].toFixed(0)}ms
-        {:else if data.values[data.values.length - 1] >= 1000}
-          {(data.values[data.values.length - 1] / 1000).toFixed(1)}K
-        {:else}
-          {data.values[data.values.length - 1].toFixed(0)}
-        {/if}
-      </span>
+      <span class="chart-value">{formatHeaderValue(data.values[data.values.length - 1])}</span>
     {/if}
   </div>
   <div class="chart-container" bind:this={container}></div>
