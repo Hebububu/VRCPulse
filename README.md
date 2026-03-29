@@ -14,7 +14,7 @@
 
 Monitor VRChat server status, API latency, error rates, and incident history with live-updating charts. Available as a **desktop app**, **web dashboard**, and **Discord bot**.
 
-[Web Dashboard](https://vrcdevs.com) · [Download Desktop App](https://github.com/Hebububu/VRCPulse/releases/latest) · [Add Discord Bot](https://discord.com/oauth2/authorize?client_id=1456912795462275166&permissions=49152&scope=bot%20applications.commands) · [Discord Community](https://discord.gg/JW3XrskcpK)
+[Web Dashboard](https://vrcpulse.vrcdevs.com) · [Download Desktop App](https://github.com/Hebububu/VRCPulse/releases/latest) · [Add Discord Bot](https://discord.com/oauth2/authorize?client_id=1456912795462275166&permissions=49152&scope=bot%20applications.commands) · [Discord Community](https://discord.gg/JW3XrskcpK)
 
 </div>
 
