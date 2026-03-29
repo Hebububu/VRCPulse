@@ -272,6 +272,7 @@
     font-size: 11px;
     color: #52525b;
     font-family: 'Geist Mono', monospace;
+    flex-wrap: wrap;
   }
 
   .separator { color: #3f3f46; }
@@ -362,5 +363,25 @@
       animation: none;
       opacity: 0;
     }
+  }
+
+  @media (max-width: 768px) {
+    .insight-card { padding: 10px 12px; }
+    .insight-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .insight-title-row { flex-wrap: wrap; gap: 6px; }
+    .insight-headline { font-size: 14px; margin-bottom: 6px; }
+    .insight-bullets li {
+      font-size: 13px;
+      padding: 3px 0;
+      padding-left: 14px;
+      line-height: 1.4;
+    }
+    .insight-footer { margin-top: 6px; padding-top: 6px; }
+    .insight-confidence { display: none; }
   }
 </style>

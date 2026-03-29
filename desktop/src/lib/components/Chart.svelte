@@ -153,7 +153,7 @@
   });
 </script>
 
-<div class="chart-card" class:hero>
+<div class="chart-card" class:hero role="img" aria-label="{title}{data && data.values.length > 0 ? ': ' + formatHeaderValue(data.values[data.values.length - 1]) : ''}">
   <div class="chart-header">
     <span class="chart-title">
       {title}
@@ -178,8 +178,8 @@
 
 <style>
   .chart-card {
-    background: #1a1d27;
-    border: 1px solid #2a2d37;
+    background: var(--surface);
+    border: 1px solid var(--border);
     overflow: hidden;
     min-width: 0;
   }
@@ -197,7 +197,7 @@
     gap: 6px;
     font-size: 12px;
     font-weight: 500;
-    color: #71717a;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -216,8 +216,8 @@
     font-size: 9px;
     font-weight: 700;
     font-family: 'Geist Mono', monospace;
-    color: #71717a;
-    border: 1px solid #71717a;
+    color: var(--text-secondary);
+    border: 1px solid var(--text-secondary);
     border-radius: 50%;
     cursor: help;
     text-transform: none;
@@ -225,8 +225,8 @@
   }
 
   .hint-wrap:hover .hint-icon {
-    color: #e4e4e7;
-    border-color: #e4e4e7;
+    color: var(--text-primary);
+    border-color: var(--text-primary);
   }
 
   .hint-tooltip {
@@ -236,8 +236,8 @@
     left: 0;
     width: 220px;
     padding: 8px 10px;
-    background: #1a1d27;
-    border: 1px solid #2a2d37;
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: #a1a1aa;
     font-size: 11px;
     font-weight: 400;
@@ -262,7 +262,7 @@
     font-family: 'Geist Mono', monospace;
     font-size: 24px;
     font-weight: 700;
-    color: #e4e4e7;
+    color: var(--text-primary);
   }
 
   .chart-value.secondary {
@@ -276,5 +276,31 @@
 
   .hero .chart-container {
     height: 220px;
+  }
+
+  @media (max-width: 768px) {
+    .chart-card { overflow: visible; }
+    .chart-header {
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 10px 12px 0;
+    }
+    .chart-container { height: 120px; }
+    .hero .chart-container { height: 180px; }
+    .chart-value { font-size: 18px; }
+    .chart-value.secondary { font-size: 14px; }
+    .hint-wrap { position: static; }
+    .hint-tooltip {
+      display: block;
+      position: static;
+      width: 100%;
+      margin-top: 2px;
+      padding: 4px 0;
+      background: transparent;
+      border: none;
+      color: #52525b;
+      font-size: 10px;
+    }
+    .hint-icon { display: none; }
   }
 </style>

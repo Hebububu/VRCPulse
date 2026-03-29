@@ -25,7 +25,7 @@
   .selector {
     display: flex;
     gap: 0;
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
   }
 
   .range-btn {
@@ -34,9 +34,9 @@
     font-weight: 500;
     padding: 6px 12px;
     background: transparent;
-    color: #71717a;
+    color: var(--text-secondary);
     border: none;
-    border-right: 1px solid #2a2d37;
+    border-right: 1px solid var(--border);
     cursor: pointer;
     transition: all 100ms;
   }
@@ -46,12 +46,23 @@
   }
 
   .range-btn:hover {
-    color: #e4e4e7;
-    background: #22252f;
+    color: var(--text-primary);
+    background: var(--surface-hover);
   }
 
   .range-btn.active {
-    color: #60a5fa;
-    background: #1a1d27;
+    color: var(--accent);
+    background: var(--surface);
+  }
+
+  @media (max-width: 768px) {
+    .selector { width: 100%; }
+    .range-btn {
+      flex: 1;
+      min-height: 44px;
+      padding: 8px 12px;
+      font-size: 13px;
+      text-align: center;
+    }
   }
 </style>

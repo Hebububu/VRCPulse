@@ -71,7 +71,7 @@
   - Mobile: <768px (single column stack)
 - **Status bar:** Full-width, 56px height, sticky top
 - **Hero chart:** Full-width, 240px height (desktop), 180px (mobile)
-- **Secondary charts:** 2-column grid, 160px height each
+- **Secondary charts:** 2-column grid, 160px height each (120px mobile)
 - **Incident feed:** Right sidebar on desktop (320px), below charts on mobile
 
 ## Motion

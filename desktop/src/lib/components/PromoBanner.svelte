@@ -58,14 +58,14 @@
     gap: 12px;
     padding: 12px 14px;
     text-decoration: none;
-    border: 1px solid #2a2d37;
-    background: #1a1d27;
+    border: 1px solid var(--border);
+    background: var(--surface);
     cursor: pointer;
     transition: all 150ms ease-out;
   }
 
   .promo-card:hover {
-    background: #22252f;
+    background: var(--surface-hover);
     border-color: #3a3d47;
   }
 
@@ -107,24 +107,34 @@
   .card-title {
     font-size: 13px;
     font-weight: 600;
-    color: #e4e4e7;
+    color: var(--text-primary);
   }
 
   .card-desc {
     font-size: 11px;
-    color: #71717a;
+    color: var(--text-secondary);
   }
 
   .card-arrow {
     font-family: 'Geist Mono', monospace;
     font-size: 14px;
-    color: #71717a;
+    color: var(--text-secondary);
     flex-shrink: 0;
     transition: transform 150ms ease-out;
   }
 
   .promo-card:hover .card-arrow {
     transform: translateX(3px);
-    color: #e4e4e7;
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .promo-card {
+      padding: 10px 12px;
+      min-height: 44px;
+    }
+    .card-icon { width: 32px; height: 32px; }
+    .card-title { font-size: 12px; }
+    .card-desc { font-size: 10px; }
   }
 </style>

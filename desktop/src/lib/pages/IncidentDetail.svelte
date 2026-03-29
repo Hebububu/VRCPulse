@@ -147,10 +147,10 @@
           </div>
           {#each history as snap}
             <div class="history-row">
-              <span class="history-time">{formatDateTime(snap.fetched_at)}</span>
-              <span style="color: {statusColor(snap.status)}">{snap.status}</span>
-              <span style="color: {impactColor(snap.impact)}">{snap.impact}</span>
-              <span>{snap.update_count}</span>
+              <span class="history-time" data-label="Time">{formatDateTime(snap.fetched_at)}</span>
+              <span data-label="Status" style="color: {statusColor(snap.status)}">{snap.status}</span>
+              <span data-label="Impact" style="color: {impactColor(snap.impact)}">{snap.impact}</span>
+              <span data-label="Updates">{snap.update_count}</span>
             </div>
           {/each}
         </div>
@@ -175,14 +175,14 @@
   .back-btn {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    color: #60a5fa;
+    color: var(--accent);
     background: none;
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
     padding: 6px 12px;
     cursor: pointer;
   }
 
-  .back-btn:hover { background: #22252f; }
+  .back-btn:hover { background: var(--surface-hover); }
 
   .incident-header {
     margin-bottom: 32px;
@@ -205,7 +205,7 @@
   h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #e4e4e7;
+    color: var(--text-primary);
     margin: 0;
   }
 
@@ -225,13 +225,13 @@
   .date, .duration {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    color: #71717a;
+    color: var(--text-secondary);
   }
 
   .source-link {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    color: #60a5fa;
+    color: var(--accent);
     background: none;
     border: none;
     padding: 0;
@@ -247,21 +247,21 @@
   h2 {
     font-size: 14px;
     font-weight: 500;
-    color: #71717a;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 0 0 16px 0;
   }
 
-  .empty { color: #71717a; font-size: 14px; }
+  .empty { color: var(--text-secondary); font-size: 14px; }
   .error { color: #ef4444; font-size: 14px; }
-  .loading { color: #71717a; font-family: 'Geist Mono', monospace; }
+  .loading { color: var(--text-secondary); font-family: 'Geist Mono', monospace; }
 
   .timeline {
     display: flex;
     flex-direction: column;
     gap: 0;
-    border-left: 1px solid #2a2d37;
+    border-left: 1px solid var(--border);
     margin-left: 4px;
   }
 
@@ -300,7 +300,7 @@
   .update-time {
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
-    color: #71717a;
+    color: var(--text-secondary);
   }
 
   .update-body {
@@ -311,7 +311,7 @@
   }
 
   .history-table {
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
   }
 
   .history-header, .history-row {
@@ -321,21 +321,50 @@
   }
 
   .history-header {
-    background: #1a1d27;
+    background: var(--surface);
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
-    color: #71717a;
+    color: var(--text-secondary);
     text-transform: uppercase;
-    border-bottom: 1px solid #2a2d37;
+    border-bottom: 1px solid var(--border);
   }
 
   .history-row {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    color: #e4e4e7;
-    border-bottom: 1px solid #2a2d37;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
   }
 
   .history-row:last-child { border-bottom: none; }
-  .history-time { color: #71717a; }
+  .history-time { color: var(--text-secondary); }
+
+  @media (max-width: 768px) {
+    .page { padding: 12px; }
+    h1 { font-size: 18px; word-break: break-word; }
+    .title-row { gap: 8px; }
+    .meta-row { flex-wrap: wrap; gap: 6px; }
+    .timeline-item { gap: 12px; padding: 12px 0; }
+    .update-body { font-size: 13px; }
+    .history-header { display: none; }
+    .history-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px 12px;
+    }
+    .history-row span[data-label]::before {
+      content: attr(data-label) ': ';
+      font-size: 10px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: 'Geist Mono', monospace;
+    }
+    .source-link {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+    }
+  }
 </style>

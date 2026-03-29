@@ -66,8 +66,8 @@
 
 <style>
   .feed {
-    background: #1a1d27;
-    border: 1px solid #2a2d37;
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 16px;
     overflow-y: auto;
   }
@@ -82,7 +82,7 @@
   .feed-title {
     font-size: 12px;
     font-weight: 500;
-    color: #71717a;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 0;
@@ -91,20 +91,20 @@
   .view-all {
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
-    color: #60a5fa;
+    color: var(--accent);
     background: none;
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
     padding: 4px 8px;
     cursor: pointer;
   }
 
   .view-all:hover {
-    background: #22252f;
+    background: var(--surface-hover);
   }
 
   .empty {
     font-size: 14px;
-    color: #71717a;
+    color: var(--text-secondary);
     font-family: 'Geist Mono', monospace;
   }
 
@@ -114,7 +114,7 @@
     text-align: left;
     padding: 10px 0;
     border: none;
-    border-bottom: 1px solid #2a2d37;
+    border-bottom: 1px solid var(--border);
     background: none;
     cursor: pointer;
     color: inherit;
@@ -126,7 +126,7 @@
   }
 
   .incident:hover {
-    background: #22252f;
+    background: var(--surface-hover);
     margin: 0 -16px;
     padding: 10px 16px;
     width: calc(100% + 32px);
@@ -148,7 +148,7 @@
   .incident-name {
     font-size: 13px;
     font-weight: 500;
-    color: #e4e4e7;
+    color: var(--text-primary);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -172,6 +172,32 @@
   .incident-time {
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
-    color: #71717a;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .feed { padding: 12px; }
+    .incident {
+      padding: 12px 0;
+    }
+    .incident:hover {
+      margin: 0;
+      padding: 12px 0;
+      width: 100%;
+      background: transparent;
+    }
+    .incident:active {
+      background: var(--surface-hover);
+      margin: 0 -12px;
+      padding: 12px;
+      width: calc(100% + 24px);
+    }
+    .view-all {
+      min-height: 44px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+    }
+    .incident-name { font-size: 14px; }
   }
 </style>

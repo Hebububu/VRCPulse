@@ -109,9 +109,9 @@
     justify-content: space-between;
     padding: 8px 16px;
     background: rgba(96, 165, 250, 0.1);
-    border-bottom: 1px solid #60a5fa;
+    border-bottom: 1px solid var(--accent);
     font-size: 13px;
-    color: #60a5fa;
+    color: var(--accent);
   }
 
   .update-actions {
@@ -123,8 +123,8 @@
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
     padding: 4px 12px;
-    background: #60a5fa;
-    color: #0f1117;
+    background: var(--accent);
+    color: var(--bg);
     border: none;
     cursor: pointer;
     font-weight: 600;
@@ -137,7 +137,7 @@
 
   .update-error {
     font-size: 12px;
-    color: #ef4444;
+    color: var(--status-critical);
   }
 
   .dismiss-btn {
@@ -145,8 +145,8 @@
     font-size: 12px;
     padding: 4px 12px;
     background: transparent;
-    color: #60a5fa;
-    border: 1px solid #60a5fa;
+    color: var(--accent);
+    border: 1px solid var(--accent);
     cursor: pointer;
   }
 </style>

@@ -119,28 +119,28 @@
   .back-btn {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    color: #60a5fa;
+    color: var(--accent);
     background: none;
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
     padding: 6px 12px;
     cursor: pointer;
   }
 
   .back-btn:hover {
-    background: #22252f;
+    background: var(--surface-hover);
   }
 
   h1 {
     font-size: 20px;
     font-weight: 600;
-    color: #e4e4e7;
+    color: var(--text-primary);
     margin: 0;
   }
 
   .filters {
     display: flex;
     gap: 0;
-    border: 1px solid #2a2d37;
+    border: 1px solid var(--border);
     margin-bottom: 16px;
     width: fit-content;
   }
@@ -150,7 +150,7 @@
     font-size: 12px;
     padding: 6px 16px;
     background: transparent;
-    color: #71717a;
+    color: var(--text-secondary);
     border: none;
     border-right: 1px solid #2a2d37;
     cursor: pointer;
@@ -158,18 +158,18 @@
   }
 
   .filter-btn:last-child { border-right: none; }
-  .filter-btn:hover { color: #e4e4e7; background: #22252f; }
-  .filter-btn.active { color: #60a5fa; background: #1a1d27; }
+  .filter-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+  .filter-btn.active { color: var(--accent); background: var(--surface); }
 
   .error { color: #ef4444; font-size: 14px; }
-  .loading, .empty { color: #71717a; font-family: 'Geist Mono', monospace; font-size: 14px; }
+  .loading, .empty { color: var(--text-secondary); font-family: 'Geist Mono', monospace; font-size: 14px; }
 
   .incident-list {
     display: flex;
     flex-direction: column;
     gap: 1px;
-    background: #2a2d37;
-    border: 1px solid #2a2d37;
+    background: var(--border);
+    border: 1px solid var(--border);
   }
 
   .incident-row {
@@ -177,7 +177,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px;
-    background: #1a1d27;
+    background: var(--surface);
     border: none;
     cursor: pointer;
     color: inherit;
@@ -186,7 +186,7 @@
     width: 100%;
   }
 
-  .incident-row:hover { background: #22252f; }
+  .incident-row:hover { background: var(--surface-hover); }
 
   .incident-left {
     display: flex;
@@ -213,7 +213,7 @@
   .incident-name {
     font-size: 14px;
     font-weight: 500;
-    color: #e4e4e7;
+    color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -222,7 +222,7 @@
   .incident-date {
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
-    color: #71717a;
+    color: var(--text-secondary);
   }
 
   .incident-right {
@@ -236,5 +236,36 @@
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
     text-transform: capitalize;
+  }
+
+  @media (max-width: 768px) {
+    .page { padding: 12px; }
+    .page-header { margin-bottom: 16px; gap: 12px; }
+    h1 { font-size: 18px; }
+    .back-btn { min-height: 44px; display: flex; align-items: center; }
+    .filters {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 12px;
+    }
+    .filter-btn {
+      flex: 1;
+      min-height: 44px;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+    .incident-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 14px 12px;
+    }
+    .incident-right {
+      width: 100%;
+      justify-content: flex-start;
+      gap: 12px;
+    }
+    .incident-name { white-space: normal; }
   }
 </style>

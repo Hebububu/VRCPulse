@@ -19,7 +19,7 @@
   let isTauri = $state(false);
   onMount(() => { isTauri = '__TAURI_INTERNALS__' in window; });
 
-  let range = $state('1h');
+  let range = $state('24h');
   let dashboard: DashboardResponse | null = $state(null);
   let incidents: Incident[] = $state([]);
   let previousIncidentIds: Set<string> = new Set();
@@ -107,12 +107,12 @@
     </div>
   {/if}
 
+  {#if !isTauri}
+    <InsightCard {insight} />
+  {/if}
+
   <div class="main-area">
     <div class="charts-area">
-      {#if !isTauri}
-        <InsightCard {insight} />
-      {/if}
-
       <Chart
         data={dashboard?.metrics?.online_users ?? null}
         title={t('chart.onlineUsers')}
@@ -203,8 +203,8 @@
     justify-content: space-between;
     padding: 8px 16px;
     background: rgba(239, 68, 68, 0.1);
-    border: 1px solid #ef4444;
-    color: #ef4444;
+    border: 1px solid var(--status-critical);
+    color: var(--status-critical);
     font-size: 14px;
   }
 
@@ -213,8 +213,8 @@
     font-size: 12px;
     padding: 4px 12px;
     background: transparent;
-    color: #ef4444;
-    border: 1px solid #ef4444;
+    color: var(--status-critical);
+    border: 1px solid var(--status-critical);
     cursor: pointer;
   }
 
@@ -257,8 +257,24 @@
   }
 
   @media (max-width: 768px) {
+    .dashboard {
+      padding: 12px;
+      gap: 12px;
+    }
     .chart-grid {
       grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .toolbar {
+      justify-content: stretch;
+    }
+    .error-banner {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .error-banner button {
+      min-height: 44px;
+      padding: 8px 16px;
     }
   }
 </style>

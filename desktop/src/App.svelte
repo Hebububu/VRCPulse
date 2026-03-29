@@ -25,8 +25,8 @@
   }
 
   :global(body) {
-    background: #0f1117;
-    color: #e4e4e7;
+    background: var(--bg);
+    color: var(--text-primary);
     font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
