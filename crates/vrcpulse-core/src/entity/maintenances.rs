@@ -9,6 +9,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub title: String,
+    #[sea_orm(column_type = "Text")]
+    pub description: String,
     pub status: String,
     pub scheduled_for: DateTimeUtc,
     pub scheduled_until: DateTimeUtc,

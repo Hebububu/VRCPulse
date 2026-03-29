@@ -82,6 +82,8 @@ pub struct Maintenance {
     pub scheduled_until: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub incident_updates: Vec<IncidentUpdate>,
 }
 
 // =============================================================================

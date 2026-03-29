@@ -83,6 +83,7 @@ export default {
   'maintenance.noRecords': '예정된 점검이 없습니다',
   'maintenance.recent': '점검',
   'maintenance.notFound': '점검을 찾을 수 없습니다',
+  'maintenance.description': '설명',
 
   // AI Insight
   'insight.confidence.high': '높음',

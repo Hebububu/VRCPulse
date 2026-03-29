@@ -102,6 +102,13 @@
       </button>
     </div>
 
+    {#if maintenance.description}
+      <div class="section">
+        <h2>{t('maintenance.description')}</h2>
+        <p class="description">{maintenance.description}</p>
+      </div>
+    {/if}
+
     {#if history.length > 0}
       <div class="section">
         <h2>{t('maintenance.changeHistory')}</h2>
@@ -212,6 +219,13 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 0 0 16px 0;
+  }
+
+  .description {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0;
   }
 
   .error { color: #ef4444; font-size: 14px; }

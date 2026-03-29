@@ -38,6 +38,7 @@ export interface IncidentsListResponse {
 export interface Maintenance {
   id: string;
   name: string;
+  description: string;
   status: string;
   scheduled_for: string;
   scheduled_until: string;

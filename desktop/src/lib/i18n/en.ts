@@ -83,6 +83,7 @@ export default {
   'maintenance.noRecords': 'No scheduled maintenance',
   'maintenance.recent': 'Maintenance',
   'maintenance.notFound': 'Maintenance not found',
+  'maintenance.description': 'Description',
 
   // AI Insight
   'insight.confidence.high': 'High',

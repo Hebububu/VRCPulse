@@ -22,14 +22,31 @@
   let streaming = $state(false);
   let activeTimers: ReturnType<typeof setTimeout>[] = [];
 
-  // Streaming text state
-  let displayHeadline = $state('');
-  let displayBullets = $state<string[]>([]);
-  let showFooter = $state(true);
+  // Typing cursor position: characters revealed so far across all content
+  let typedTotal = $state(0);
+  let totalChars = $state(0);
 
   const CHAR_DELAY = 18;
   const BULLET_CHAR_DELAY = 12;
   const BULLET_GAP = 80;
+
+  // Compute typed/untyped split for headline and each bullet
+  let headlineTyped = $derived.by(() => {
+    if (!insight) return 0;
+    return Math.min(typedTotal, insight.headline.length);
+  });
+
+  let bulletTyped = $derived.by(() => {
+    if (!insight) return [] as number[];
+    let consumed = insight.headline.length;
+    return insight.summary.bullets.map((b) => {
+      const typed = Math.max(0, Math.min(typedTotal - consumed, b.length));
+      consumed += b.length;
+      return typed;
+    });
+  });
+
+  let footerRevealed = $derived(typedTotal >= totalChars);
 
   // Detect new insight and start streaming
   $effect(() => {
@@ -51,56 +68,44 @@
   function startStreaming(data: AiInsightResponse) {
     clearAllTimers();
 
+    const headline = data.headline;
+    const bullets = data.summary.bullets;
+    totalChars = headline.length + bullets.reduce((sum, b) => sum + b.length, 0);
+
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      displayHeadline = data.headline;
-      displayBullets = [...data.summary.bullets];
-      showFooter = true;
+      typedTotal = totalChars;
       return;
     }
 
     streaming = true;
-    displayHeadline = '';
-    displayBullets = [];
-    showFooter = false;
+    typedTotal = 0;
 
-    const headline = data.headline;
-    const bullets = data.summary.bullets;
-
-    // Stream headline
-    for (let i = 0; i <= headline.length; i++) {
-      activeTimers.push(setTimeout(() => {
-        displayHeadline = headline.slice(0, i);
-      }, i * CHAR_DELAY));
+    // Schedule headline characters
+    let t = 0;
+    for (let i = 1; i <= headline.length; i++) {
+      t += CHAR_DELAY;
+      const target = i;
+      activeTimers.push(setTimeout(() => { typedTotal = target; }, t));
     }
 
-    const headlineDone = headline.length * CHAR_DELAY;
-
-    // Stream bullets sequentially
-    let bulletOffset = headlineDone + BULLET_GAP;
+    // Schedule bullet characters sequentially with gaps
+    let charOffset = headline.length;
     for (let b = 0; b < bullets.length; b++) {
+      t += BULLET_GAP;
       const bullet = bullets[b];
-      const slotTime = bulletOffset;
-
-      activeTimers.push(setTimeout(() => {
-        displayBullets = [...displayBullets, ''];
-      }, slotTime));
-
-      for (let c = 0; c <= bullet.length; c++) {
-        activeTimers.push(setTimeout(() => {
-          displayBullets = displayBullets.map((existing, idx) =>
-            idx === b ? bullet.slice(0, c) : existing
-          );
-        }, slotTime + c * BULLET_CHAR_DELAY));
+      for (let c = 1; c <= bullet.length; c++) {
+        t += BULLET_CHAR_DELAY;
+        const target = charOffset + c;
+        activeTimers.push(setTimeout(() => { typedTotal = target; }, t));
       }
-
-      bulletOffset += bullet.length * BULLET_CHAR_DELAY + BULLET_GAP;
+      charOffset += bullet.length;
     }
 
-    // Show footer after streaming completes
+    // End streaming
     activeTimers.push(setTimeout(() => {
-      showFooter = true;
+      typedTotal = totalChars;
       streaming = false;
-    }, bulletOffset));
+    }, t + BULLET_GAP));
   }
 
   function timeAgo(dateStr: string): string {
@@ -158,25 +163,21 @@
     </div>
 
     <div class="insight-headline">
-      {displayHeadline}{#if streaming && displayBullets.length === 0}<span class="cursor" aria-hidden="true"></span>{/if}
+      <span class="typed">{insight.headline.slice(0, headlineTyped)}</span>{#if streaming && headlineTyped < insight.headline.length && headlineTyped > 0}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{insight.headline.slice(headlineTyped)}</span>
     </div>
 
-    {#if displayBullets.length > 0}
-      <ul class="insight-bullets">
-        {#each displayBullets as bullet, i}
-          <li>
-            {bullet}{#if streaming && i === displayBullets.length - 1 && bullet !== (insight.summary.bullets[i] ?? '')}<span class="cursor" aria-hidden="true"></span>{/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <ul class="insight-bullets">
+      {#each insight.summary.bullets as bullet, i}
+        <li>
+          <span class="typed">{bullet.slice(0, bulletTyped[i])}</span>{#if streaming && bulletTyped[i] > 0 && bulletTyped[i] < bullet.length}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{bullet.slice(bulletTyped[i])}</span>
+        </li>
+      {/each}
+    </ul>
 
-    {#if showFooter}
-      <div class="insight-footer">
-        <span>{t('insight.nextAnalysis')}: {timeUntil(insight.expires_at)}</span>
-        <span class="insight-basis">{t('insight.basis')}</span>
-      </div>
-    {/if}
+    <div class="insight-footer" class:untyped-footer={!footerRevealed}>
+      <span>{t('insight.nextAnalysis')}: {timeUntil(insight.expires_at)}</span>
+      <span class="insight-basis">{t('insight.basis')}</span>
+    </div>
   </div>
 {/if}
 
@@ -365,6 +366,31 @@
     color: rgba(96, 165, 250, 0.6) !important;
   }
 
+  .untyped {
+    color: transparent;
+    background: linear-gradient(90deg, #1a1d27 25%, #2a2d37 50%, #1a1d27 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  .untyped:empty {
+    display: none;
+  }
+
+  .untyped-footer span {
+    color: transparent;
+    background: linear-gradient(90deg, #1a1d27 25%, #2a2d37 50%, #1a1d27 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .sparkle-icon.streaming {
       animation: none;
@@ -372,6 +398,9 @@
     .cursor {
       animation: none;
       opacity: 0;
+    }
+    .untyped, .untyped-footer span {
+      animation: none;
     }
   }
 

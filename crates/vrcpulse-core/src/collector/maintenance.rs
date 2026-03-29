@@ -154,23 +154,35 @@ pub async fn poll(client: &Client, db: &DatabaseConnection) -> Result<Vec<Mainte
     Ok(changes)
 }
 
+/// Extract the latest description from incident_updates.
+fn extract_description(m: &ApiMaintenance) -> String {
+    m.incident_updates
+        .iter()
+        .max_by_key(|u| u.created_at)
+        .map(|u| u.body.clone())
+        .unwrap_or_default()
+}
+
 /// Upsert a maintenance record. Returns a change event if something changed.
 async fn upsert_maintenance(
     db: &DatabaseConnection,
     m: &ApiMaintenance,
 ) -> Result<Option<MaintenanceChange>> {
     let existing = maintenances::Entity::find_by_id(&m.id).one(db).await?;
+    let description = extract_description(m);
 
     match existing {
         Some(existing) => {
             let status_changed = existing.status != m.status;
             let rescheduled = existing.scheduled_for != m.scheduled_for
                 || existing.scheduled_until != m.scheduled_until;
+            let desc_changed = existing.description != description;
 
-            if status_changed || rescheduled || existing.title != m.name {
+            if status_changed || rescheduled || existing.title != m.name || desc_changed {
                 let old_status = existing.status.clone();
                 let mut active: maintenances::ActiveModel = existing.into();
                 active.title = Set(m.name.clone());
+                active.description = Set(description);
                 active.status = Set(m.status.clone());
                 active.scheduled_for = Set(m.scheduled_for);
                 active.scheduled_until = Set(m.scheduled_until);
@@ -198,6 +210,7 @@ async fn upsert_maintenance(
             let active = maintenances::ActiveModel {
                 id: Set(m.id.clone()),
                 title: Set(m.name.clone()),
+                description: Set(description),
                 status: Set(m.status.clone()),
                 scheduled_for: Set(m.scheduled_for),
                 scheduled_until: Set(m.scheduled_until),

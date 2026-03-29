@@ -7,6 +7,7 @@ mod m20260328_002_add_incident_translations;
 mod m20260328_003_add_ai_insights;
 mod m20260329_001_add_insight_i18n;
 mod m20260329_003_add_maintenance_snapshots;
+mod m20260329_004_add_maintenance_description;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260328_003_add_ai_insights::Migration),
             Box::new(m20260329_001_add_insight_i18n::Migration),
             Box::new(m20260329_003_add_maintenance_snapshots::Migration),
+            Box::new(m20260329_004_add_maintenance_description::Migration),
         ]
     }
 }

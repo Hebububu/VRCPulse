@@ -61,6 +61,7 @@ pub struct IncidentsListResponse {
 pub struct MaintenanceResponse {
     pub id: String,
     pub name: String,
+    pub description: String,
     pub status: String,
     pub scheduled_for: String,
     pub scheduled_until: String,
@@ -279,6 +280,7 @@ impl VrcPulseService {
                 .map(|m| MaintenanceResponse {
                     id: m.id,
                     name: m.title,
+                    description: m.description,
                     status: m.status,
                     scheduled_for: m.scheduled_for.to_rfc3339(),
                     scheduled_until: m.scheduled_until.to_rfc3339(),
@@ -297,6 +299,7 @@ impl VrcPulseService {
         Ok(m.map(|m| MaintenanceResponse {
             id: m.id,
             name: m.title,
+            description: m.description,
             status: m.status,
             scheduled_for: m.scheduled_for.to_rfc3339(),
             scheduled_until: m.scheduled_until.to_rfc3339(),
@@ -718,8 +721,8 @@ mod tests {
     async fn test_get_maintenance_by_id_found() {
         let db = setup_test_db().await;
         db.execute_unprepared(
-            "INSERT INTO maintenances (id, title, status, scheduled_for, scheduled_until, created_at, updated_at) \
-             VALUES ('mnt-1', 'Server Migration', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+3 hours'), datetime('now'), datetime('now'))",
+            "INSERT INTO maintenances (id, title, description, status, scheduled_for, scheduled_until, created_at, updated_at) \
+             VALUES ('mnt-1', 'Server Migration', 'Migrating to new infrastructure', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+3 hours'), datetime('now'), datetime('now'))",
         )
         .await
         .unwrap();
@@ -777,10 +780,10 @@ mod tests {
     async fn test_get_maintenances_filters() {
         let db = setup_test_db().await;
         db.execute_unprepared(
-            "INSERT INTO maintenances (id, title, status, scheduled_for, scheduled_until, created_at, updated_at) VALUES \
-             ('m1', 'Scheduled One', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+2 hours'), datetime('now'), datetime('now')), \
-             ('m2', 'In Progress', 'in_progress', datetime('now'), datetime('now', '+1 hour'), datetime('now'), datetime('now')), \
-             ('m3', 'Done', 'completed', datetime('now', '-2 hours'), datetime('now', '-1 hour'), datetime('now'), datetime('now'))",
+            "INSERT INTO maintenances (id, title, description, status, scheduled_for, scheduled_until, created_at, updated_at) VALUES \
+             ('m1', 'Scheduled One', '', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+2 hours'), datetime('now'), datetime('now')), \
+             ('m2', 'In Progress', '', 'in_progress', datetime('now'), datetime('now', '+1 hour'), datetime('now'), datetime('now')), \
+             ('m3', 'Done', '', 'completed', datetime('now', '-2 hours'), datetime('now', '-1 hour'), datetime('now'), datetime('now'))",
         )
         .await
         .unwrap();
