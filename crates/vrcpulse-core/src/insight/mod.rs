@@ -19,7 +19,7 @@ use gemini_client::InsightResponse;
 use gemini_client::{GeminiClient, InsightError};
 
 const ANALYSIS_INTERVAL_SECS: u64 = 3600; // 1 hour
-const MODEL_ID: &str = "gemini-2.5-flash";
+const MODEL_ID: &str = "gemini-3.1-flash-lite-preview";
 
 /// Trigger types for the analysis task.
 #[derive(Debug, Clone)]
@@ -160,6 +160,21 @@ async fn run_single_analysis(
                 debug!("Skipping analysis: source_hash unchanged and both languages present");
                 return Ok(false);
             }
+            // English exists but Korean missing — retry translation only
+            if let Some((en_insight, cycle_id)) = get_latest_english_only_cycle(db).await? {
+                debug!("Source hash unchanged, retrying Korean translation only");
+                translate_and_store(
+                    db,
+                    client,
+                    trigger,
+                    &snapshot,
+                    &en_insight,
+                    &source_hash,
+                    &cycle_id,
+                )
+                .await;
+                return Ok(true);
+            }
             debug!("Source hash unchanged but translation missing, regenerating");
         }
     }
@@ -183,18 +198,46 @@ async fn run_single_analysis(
     .await
     .map_err(|e| InsightError::ParseFailed(format!("DB write error: {e}")))?;
 
-    // Step 6: Translate to Korean (partial failure is OK)
-    match client.translate_insight(&en_response).await {
+    // Step 6: Translate to Korean with retry
+    translate_and_store(
+        db,
+        client,
+        trigger,
+        &snapshot,
+        &en_response,
+        &source_hash,
+        &cycle_id,
+    )
+    .await;
+
+    Ok(true)
+}
+
+/// Translate English insight to Korean and store, with 1 retry on failure.
+async fn translate_and_store(
+    db: &DatabaseConnection,
+    client: &GeminiClient,
+    trigger: &InsightTrigger,
+    snapshot: &FeatureSnapshot,
+    en_response: &InsightResponse,
+    source_hash: &str,
+    cycle_id: &str,
+) {
+    // Brief delay before translation to avoid rate limiting
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let ko_hash = format!("{source_hash}:ko");
+
+    match client.translate_insight(en_response).await {
         Ok(ko_response) => {
-            let ko_hash = format!("{source_hash}:ko");
             if let Err(e) = store_insight(
                 db,
                 trigger,
-                &snapshot,
+                snapshot,
                 &ko_response,
                 &ko_hash,
                 "ko",
-                &cycle_id,
+                cycle_id,
             )
             .await
             {
@@ -202,11 +245,68 @@ async fn run_single_analysis(
             }
         }
         Err(e) => {
-            warn!(error = %e, "Korean translation failed, English-only insight stored");
+            warn!(error = %e, "Korean translation failed, retrying in 3s...");
+            tokio::time::sleep(Duration::from_secs(3)).await;
+
+            match client.translate_insight(en_response).await {
+                Ok(ko_response) => {
+                    if let Err(e) = store_insight(
+                        db,
+                        trigger,
+                        snapshot,
+                        &ko_response,
+                        &ko_hash,
+                        "ko",
+                        cycle_id,
+                    )
+                    .await
+                    {
+                        warn!(error = %e, "Failed to store Korean translation on retry");
+                    } else {
+                        info!("Korean translation succeeded on retry");
+                    }
+                }
+                Err(e2) => {
+                    warn!(error = %e2, "Korean translation failed after retry, English-only insight stored");
+                }
+            }
         }
     }
+}
 
-    Ok(true)
+/// Find the latest cycle that has English but no Korean translation.
+/// Returns the English InsightResponse and cycle_id if found.
+async fn get_latest_english_only_cycle(
+    db: &DatabaseConnection,
+) -> Result<Option<(InsightResponse, String)>, InsightError> {
+    let latest = ai_insights::Entity::find()
+        .filter(ai_insights::Column::Language.eq("en"))
+        .order_by_desc(ai_insights::Column::CreatedAt)
+        .one(db)
+        .await
+        .map_err(|e| InsightError::ParseFailed(format!("DB error: {e}")))?;
+
+    let latest = match latest {
+        Some(l) if !l.cycle_id.is_empty() => l,
+        _ => return Ok(None),
+    };
+
+    // Check if Korean exists in this cycle
+    let ko_count = ai_insights::Entity::find()
+        .filter(ai_insights::Column::CycleId.eq(&latest.cycle_id))
+        .filter(ai_insights::Column::Language.eq("ko"))
+        .count(db)
+        .await
+        .map_err(|e| InsightError::ParseFailed(format!("DB error: {e}")))?;
+
+    if ko_count > 0 {
+        return Ok(None); // Already has Korean
+    }
+
+    let en_response: InsightResponse = serde_json::from_str(&latest.summary_json)
+        .map_err(|e| InsightError::ParseFailed(format!("JSON parse error: {e}")))?;
+
+    Ok(Some((en_response, latest.cycle_id)))
 }
 
 fn generate_cycle_id() -> String {
