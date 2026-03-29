@@ -7,9 +7,10 @@
 
   interface Props {
     bundle: InsightBundle | null;
+    mode?: 'full' | 'compact';
   }
 
-  let { bundle }: Props = $props();
+  let { bundle, mode = 'full' }: Props = $props();
 
   let insight = $derived.by(() => {
     if (!bundle) return null;
@@ -145,40 +146,53 @@
 </script>
 
 {#if insight}
-  <div class="insight-card {severityClass}" role="region" aria-label={t('insight.ariaLabel')}>
-    <div class="insight-header">
-      <div class="insight-title-row">
-        <div class="sparkle-icon" class:streaming>
-          <Sparkle size={16} weight="fill" />
+  {#if mode === 'compact'}
+    <div class="insight-card insight-compact {severityClass}" role="region" aria-label={t('insight.ariaLabel')}>
+      <div class="compact-row">
+        <div class="sparkle-icon">
+          <Sparkle size={14} weight="fill" />
         </div>
-        <span class="insight-label">AI Insight</span>
+        <span class="insight-label">AI</span>
         <span class="insight-badge {severityClass}">{badgeLabel}</span>
-        <span class="insight-confidence">{t('insight.trustLabel')} {confidenceLabel(insight.confidence)}</span>
-      </div>
-      <div class="insight-meta-inline">
-        <span>{timeAgo(insight.created_at)}</span>
-        <span class="separator" aria-hidden="true">·</span>
-        <span>{insight.model_id}</span>
+        <span class="compact-headline">{insight.headline}</span>
       </div>
     </div>
+  {:else}
+    <div class="insight-card {severityClass}" role="region" aria-label={t('insight.ariaLabel')}>
+      <div class="insight-header">
+        <div class="insight-title-row">
+          <div class="sparkle-icon" class:streaming>
+            <Sparkle size={16} weight="fill" />
+          </div>
+          <span class="insight-label">AI Insight</span>
+          <span class="insight-badge {severityClass}">{badgeLabel}</span>
+          <span class="insight-confidence">{t('insight.trustLabel')} {confidenceLabel(insight.confidence)}</span>
+        </div>
+        <div class="insight-meta-inline">
+          <span>{timeAgo(insight.created_at)}</span>
+          <span class="separator" aria-hidden="true">·</span>
+          <span>{insight.model_id}</span>
+        </div>
+      </div>
 
-    <div class="insight-headline">
-      <span class="typed">{insight.headline.slice(0, headlineTyped)}</span>{#if streaming && headlineTyped < insight.headline.length && headlineTyped > 0}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{insight.headline.slice(headlineTyped)}</span>
+      <div class="insight-headline">
+        <span class="typed">{insight.headline.slice(0, headlineTyped)}</span>{#if streaming && headlineTyped < insight.headline.length && headlineTyped > 0}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{insight.headline.slice(headlineTyped)}</span>
+      </div>
+
+      <ul class="insight-bullets">
+        {#each insight.summary.bullets as bullet, i}
+          <li>
+            <span class="typed">{bullet.slice(0, bulletTyped[i])}</span>{#if streaming && bulletTyped[i] > 0 && bulletTyped[i] < bullet.length}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{bullet.slice(bulletTyped[i])}</span>
+          </li>
+        {/each}
+      </ul>
+
+      <div class="insight-footer" class:untyped-footer={!footerRevealed}>
+        <span>{t('insight.nextAnalysis')}: {timeUntil(insight.expires_at)}</span>
+        <span class="insight-basis">{t('insight.basis')}</span>
+      </div>
     </div>
-
-    <ul class="insight-bullets">
-      {#each insight.summary.bullets as bullet, i}
-        <li>
-          <span class="typed">{bullet.slice(0, bulletTyped[i])}</span>{#if streaming && bulletTyped[i] > 0 && bulletTyped[i] < bullet.length}<span class="cursor" aria-hidden="true"></span>{/if}<span class="untyped">{bullet.slice(bulletTyped[i])}</span>
-        </li>
-      {/each}
-    </ul>
-
-    <div class="insight-footer" class:untyped-footer={!footerRevealed}>
-      <span>{t('insight.nextAnalysis')}: {timeUntil(insight.expires_at)}</span>
-      <span class="insight-basis">{t('insight.basis')}</span>
-    </div>
-  </div>
+  {/if}
 {/if}
 
 <style>
@@ -402,6 +416,31 @@
     .untyped, .untyped-footer span {
       animation: none;
     }
+  }
+
+  .insight-compact {
+    padding: 8px 16px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+  }
+
+  .compact-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .compact-headline {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   @media (max-width: 768px) {

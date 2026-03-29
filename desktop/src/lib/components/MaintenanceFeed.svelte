@@ -1,15 +1,35 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import type { Maintenance } from '../types';
+  import { t, getLocale } from '../i18n';
+  import type { Maintenance, TranslationResponse } from '../types';
 
   interface Props {
     maintenances: Maintenance[];
+    translations?: Record<string, TranslationResponse>;
   }
 
-  let { maintenances }: Props = $props();
+  let { maintenances, translations = {} }: Props = $props();
 
   const recent = $derived(maintenances.slice(0, 5));
+  const isKorean = getLocale() === 'ko';
+
+  let showOriginal: Record<string, boolean> = $state({});
+
+  function toggleOriginal(e: Event, id: string) {
+    e.stopPropagation();
+    showOriginal[id] = !showOriginal[id];
+  }
+
+  function getDisplayName(m: Maintenance): string {
+    if (isKorean && translations[m.id] && !showOriginal[m.id]) {
+      return translations[m.id].translated_name;
+    }
+    return m.name;
+  }
+
+  function isTranslated(id: string): boolean {
+    return isKorean && !!translations[id] && !showOriginal[id];
+  }
 
   function timeAgo(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -57,7 +77,29 @@
       >
         <div class="item-header">
           <span class="status-dot" style="background: {statusColor(m.status)}"></span>
-          <span class="item-name">{m.name}</span>
+          <span class="item-name">{getDisplayName(m)}</span>
+          {#if isTranslated(m.id)}
+            <button
+              class="translate-btn translated"
+              onclick={(e) => toggleOriginal(e, m.id)}
+              aria-label={t('translate.showOriginal')}
+            >
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+              </svg>
+              <span class="translate-badge">{t('translate.aiTranslated')}</span>
+            </button>
+          {:else if isKorean && showOriginal[m.id]}
+            <button
+              class="translate-btn"
+              onclick={(e) => toggleOriginal(e, m.id)}
+              aria-label={t('translate.button')}
+            >
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+              </svg>
+            </button>
+          {/if}
         </div>
         <div class="item-meta">
           <span class="status-badge" style="color: {statusColor(m.status)}">{m.status === 'in_progress' ? 'in progress' : m.status}</span>
@@ -187,6 +229,38 @@
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
     color: var(--text-secondary);
+  }
+
+  .translate-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(96, 165, 250, 0.4);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    transition: color 200ms;
+  }
+  .translate-btn:hover { color: var(--accent); }
+  .translate-btn.loading { animation: sparkle-pulse 1s ease-in-out infinite; }
+  .translate-btn.translated { color: var(--accent); width: auto; }
+  .translate-btn.error { color: var(--status-critical); }
+  .translate-badge {
+    font-family: 'Geist Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(96, 165, 250, 0.2);
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  @keyframes sparkle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   @media (max-width: 768px) {

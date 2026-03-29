@@ -9,3 +9,4 @@ pub mod maintenance_snapshots;
 pub mod maintenances;
 pub mod metric_logs;
 pub mod status_logs;
+pub mod translations;

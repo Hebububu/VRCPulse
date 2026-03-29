@@ -17,6 +17,7 @@ export interface DashboardResponse {
 }
 
 export interface IncidentUpdate {
+  id: string;
   status: string;
   body: string;
   created_at: string;
@@ -85,6 +86,18 @@ export interface MaintenanceSnapshotResponse {
   scheduled_for: string;
   scheduled_until: string;
   fetched_at: string;
+}
+
+export interface TranslatedUpdate {
+  update_id: string;
+  translated_body: string;
+}
+
+export interface TranslationResponse {
+  translated_name: string;
+  translated_body: string;
+  translated_updates: TranslatedUpdate[];
+  cached: boolean;
 }
 
 export interface IncidentSnapshotResponse {

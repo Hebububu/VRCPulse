@@ -1,4 +1,4 @@
-import type { DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, InsightApiResponse, MaintenancesListResponse, MaintenanceSnapshotResponse, Maintenance } from './types';
+import type { DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, InsightApiResponse, MaintenancesListResponse, MaintenanceSnapshotResponse, Maintenance, TranslationResponse } from './types';
 
 function getApiBase(): string {
   if (typeof window === 'undefined') return 'http://localhost:3000/api';
@@ -50,4 +50,8 @@ export async function getMaintenanceHistory(maintenanceId: string): Promise<Main
 
 export async function getInsight(): Promise<InsightApiResponse> {
   return fetchApi('/insights/latest');
+}
+
+export async function getTranslation(type: 'incident' | 'maintenance', id: string, locale: string = 'ko'): Promise<TranslationResponse> {
+  return fetchApi(`/translate?type=${type}&id=${encodeURIComponent(id)}&locale=${locale}`);
 }

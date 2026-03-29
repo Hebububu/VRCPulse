@@ -7,9 +7,9 @@
   import IncidentFeed from './IncidentFeed.svelte';
   import PromoBanner from './PromoBanner.svelte';
   import { onMount } from 'svelte';
-  import { getDashboard, getIncidents, getMaintenances, getInsight } from '../api';
-  import { t } from '../i18n';
-  import type { InsightBundle, DashboardResponse, Incident, Maintenance } from '../types';
+  import { getDashboard, getIncidents, getMaintenances, getInsight, getTranslation } from '../api';
+  import { t, getLocale } from '../i18n';
+  import type { InsightBundle, DashboardResponse, Incident, Maintenance, TranslationResponse } from '../types';
 
   interface Props {
     onStatusUpdate: (status: DashboardResponse['status']) => void;
@@ -19,7 +19,41 @@
   let { onStatusUpdate, onDataReceived }: Props = $props();
 
   let isTauri = $state(false);
-  onMount(() => { isTauri = '__TAURI_INTERNALS__' in window; });
+  let windowClass: 'compact' | 'standard' | 'expanded' = $state('standard');
+
+  function getWindowClass(w: number, h: number): 'compact' | 'standard' | 'expanded' {
+    if (w >= 1600 && h >= 900) return 'expanded';
+    if (w >= 1200 && h >= 800) return 'standard';
+    return 'compact';
+  }
+
+  onMount(() => {
+    isTauri = '__TAURI_INTERNALS__' in window;
+    if (isTauri) {
+      windowClass = getWindowClass(window.innerWidth, window.innerHeight);
+      let rafId: number;
+      const handleResize = () => {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          windowClass = getWindowClass(window.innerWidth, window.innerHeight);
+        });
+      };
+      window.addEventListener('resize', handleResize);
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        cancelAnimationFrame(rafId);
+      };
+    }
+  });
+
+  const isCompact = $derived(isTauri && windowClass === 'compact');
+  const isExpanded = $derived(isTauri && windowClass === 'expanded');
+  const showSidebar = $derived(!isCompact);
+  const showSecondaryCharts = $derived(!isCompact);
+  const insightMode = $derived<'full' | 'compact'>(
+    isTauri ? (windowClass === 'expanded' ? 'full' : windowClass === 'standard' ? 'compact' : 'full') : 'full'
+  );
+  const showInsight = $derived(!isCompact);
 
   let range = $state('24h');
   let dashboard: DashboardResponse | null = $state(null);
@@ -29,6 +63,10 @@
   let maintenances: Maintenance[] = $state([]);
   let loading = $state(true);
   let error = $state('');
+
+  // Auto-translation for Korean locale
+  let incidentTranslations: Record<string, TranslationResponse> = $state({});
+  let maintenanceTranslations: Record<string, TranslationResponse> = $state({});
 
   async function sendNotification(title: string, body: string) {
     if (!('__TAURI_INTERNALS__' in window)) return;
@@ -66,7 +104,7 @@
         getDashboard(range),
         getIncidents('all'),
         getMaintenances('all').catch(() => ({ maintenances: [] })),
-        isTauri ? Promise.resolve({ insight: null }) : getInsight().catch(() => ({ insight: null })),
+        getInsight().catch(() => ({ insight: null })),
       ]);
       dashboard = dashData;
       checkNewIncidents(incData.incidents);
@@ -77,6 +115,11 @@
       onDataReceived();
       loading = false;
       error = '';
+
+      // Auto-fetch translations for Korean locale
+      if (getLocale() === 'ko') {
+        fetchTranslations(incData.incidents, maintData.maintenances);
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to fetch data';
       loading = false;
@@ -94,18 +137,44 @@
     return () => clearInterval(interval);
   });
 
+  async function fetchTranslations(incs: Incident[], maints: Maintenance[]) {
+    // Fetch translations sequentially to avoid rate limiting
+    const newIncTranslations: Record<string, TranslationResponse> = { ...incidentTranslations };
+    const newMaintTranslations: Record<string, TranslationResponse> = { ...maintenanceTranslations };
+
+    for (const inc of incs.slice(0, 5)) {
+      if (newIncTranslations[inc.id]) continue;
+      try {
+        const result = await getTranslation('incident', inc.id, 'ko');
+        newIncTranslations[inc.id] = result;
+        incidentTranslations = { ...newIncTranslations };
+      } catch { break; }
+    }
+
+    for (const m of maints.slice(0, 5)) {
+      if (newMaintTranslations[m.id]) continue;
+      try {
+        const result = await getTranslation('maintenance', m.id, 'ko');
+        newMaintTranslations[m.id] = result;
+        maintenanceTranslations = { ...newMaintTranslations };
+      } catch { break; }
+    }
+  }
+
   function handleRangeChange(newRange: string) {
     range = newRange;
     loading = true;
   }
 </script>
 
-<div class="dashboard">
+<div class="dashboard" class:desktop-dashboard={isTauri} class:compact={isCompact} class:expanded={isExpanded}>
   <MaintenanceBanner {maintenances} />
 
-  <div class="toolbar">
-    <TimeRangeSelector value={range} onChange={handleRangeChange} />
-  </div>
+  {#if !isCompact}
+    <div class="toolbar">
+      <TimeRangeSelector value={range} onChange={handleRangeChange} />
+    </div>
+  {/if}
 
   {#if error}
     <div class="error-banner">
@@ -114,8 +183,8 @@
     </div>
   {/if}
 
-  {#if !isTauri}
-    <InsightCard bundle={insightBundle} />
+  {#if showInsight}
+    <InsightCard bundle={insightBundle} mode={insightMode} />
   {/if}
 
   <div class="main-area">
@@ -124,67 +193,73 @@
         data={dashboard?.metrics?.online_users ?? null}
         title={t('chart.onlineUsers')}
         type="area"
-        hero={true}
+        hero={!isCompact}
       />
 
-      <div class="chart-grid">
-        <Chart
-          data={dashboard?.metrics?.api_latency ?? null}
-          title={t('chart.apiLatency')}
-          unit="ms"
-          thresholdValue={500}
-          thresholdColor="#eab308"
-        />
-        <Chart
-          data={dashboard?.metrics?.api_requests ?? null}
-          title={t('chart.apiRequests')}
-          unit="%"
-          hint={t('chart.hint.apiRequests')}
-        />
-      </div>
+      {#if showSecondaryCharts}
+        <div class="chart-grid">
+          <Chart
+            data={dashboard?.metrics?.api_latency ?? null}
+            title={t('chart.apiLatency')}
+            unit="ms"
+            thresholdValue={500}
+            thresholdColor="#eab308"
+          />
+          <Chart
+            data={dashboard?.metrics?.api_requests ?? null}
+            title={t('chart.apiRequests')}
+            unit="%"
+            hint={t('chart.hint.apiRequests')}
+          />
+        </div>
 
-      <div class="chart-grid">
-        <Chart
-          data={dashboard?.metrics?.api_error_rate ?? null}
-          title={t('chart.errorRate')}
-          type="area"
-          unit="%"
-          thresholdValue={5}
-          thresholdColor="#ef4444"
-        />
-        <Chart
-          data={dashboard?.metrics?.steam_auth ?? null}
-          title={t('chart.steamAuth')}
-          type="area"
-          unit="%"
-        />
-      </div>
+        <div class="chart-grid">
+          <Chart
+            data={dashboard?.metrics?.api_error_rate ?? null}
+            title={t('chart.errorRate')}
+            type="area"
+            unit="%"
+            thresholdValue={5}
+            thresholdColor="#ef4444"
+          />
+          <Chart
+            data={dashboard?.metrics?.steam_auth ?? null}
+            title={t('chart.steamAuth')}
+            type="area"
+            unit="%"
+          />
+        </div>
 
-      <div class="chart-grid">
-        <Chart
-          data={dashboard?.metrics?.meta_auth ?? null}
-          title={t('chart.metaAuth')}
-          type="area"
-          unit="%"
-        />
-        <Chart
-          data={dashboard?.metrics?.steam_share ?? null}
-          label1="Steam"
-          data2={dashboard?.metrics?.meta_share ?? null}
-          label2="Meta"
-          color2="#a78bfa"
-          title={t('chart.platformShare')}
-          unit="%"
-          hint={t('chart.hint.platformShare')}
-        />
-      </div>
+        <div class="chart-grid">
+          <Chart
+            data={dashboard?.metrics?.meta_auth ?? null}
+            title={t('chart.metaAuth')}
+            type="area"
+            unit="%"
+          />
+          <Chart
+            data={dashboard?.metrics?.steam_share ?? null}
+            label1="Steam"
+            data2={dashboard?.metrics?.meta_share ?? null}
+            label2="Meta"
+            color2="#a78bfa"
+            title={t('chart.platformShare')}
+            unit="%"
+            hint={t('chart.hint.platformShare')}
+          />
+        </div>
+      {/if}
     </div>
 
-    <div class="sidebar">
-      <PromoBanner />
-      <IncidentFeed {incidents} />
-      <MaintenanceFeed {maintenances} />
-    </div>
+    {#if showSidebar}
+      <div class="sidebar" class:sidebar-expanded={isExpanded}>
+        <PromoBanner />
+        <IncidentFeed {incidents} translations={incidentTranslations} />
+        <MaintenanceFeed {maintenances} translations={maintenanceTranslations} />
+      </div>
+    {:else}
+      <IncidentFeed {incidents} maxItems={2} compact={true} translations={incidentTranslations} />
+    {/if}
   </div>
 </div>
 
@@ -198,6 +273,21 @@
     overflow-y: auto;
     overflow-x: hidden;
     min-width: 0;
+  }
+
+  /* Desktop Tauri: no scroll on dashboard */
+  .desktop-dashboard {
+    overflow: hidden;
+    height: calc(100vh - 56px); /* Viewport minus StatusBar */
+  }
+
+  .desktop-dashboard.compact {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .desktop-dashboard.expanded .sidebar-expanded {
+    width: 360px;
   }
 
   .toolbar {

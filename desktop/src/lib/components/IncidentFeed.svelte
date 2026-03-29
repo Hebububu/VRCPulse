@@ -1,15 +1,38 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import type { Incident } from '../types';
+  import { t, getLocale } from '../i18n';
+  import type { Incident, TranslationResponse } from '../types';
 
   interface Props {
     incidents: Incident[];
+    maxItems?: number;
+    compact?: boolean;
+    translations?: Record<string, TranslationResponse>;
   }
 
-  let { incidents }: Props = $props();
+  let { incidents, maxItems = 5, compact = false, translations = {} }: Props = $props();
 
-  const recent = $derived(incidents.slice(0, 5));
+  const recent = $derived(incidents.slice(0, maxItems));
+  const isKorean = getLocale() === 'ko';
+
+  // Track which incidents user toggled to show original
+  let showOriginal: Record<string, boolean> = $state({});
+
+  function toggleOriginal(e: Event, id: string) {
+    e.stopPropagation();
+    showOriginal[id] = !showOriginal[id];
+  }
+
+  function getDisplayName(incident: Incident): string {
+    if (isKorean && translations[incident.id] && !showOriginal[incident.id]) {
+      return translations[incident.id].translated_name;
+    }
+    return incident.name;
+  }
+
+  function isTranslated(id: string): boolean {
+    return isKorean && !!translations[id] && !showOriginal[id];
+  }
 
   function timeAgo(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -43,7 +66,9 @@
 <div class="feed">
   <div class="feed-header">
     <h3 class="feed-title">{t('incidents.recent')}</h3>
-    <button class="view-all" onclick={() => push('/incidents')}>{t('incidents.viewAll')}</button>
+    {#if !compact}
+      <button class="view-all" onclick={() => push('/incidents')}>{t('incidents.viewAll')}</button>
+    {/if}
   </div>
 
   {#if recent.length === 0}
@@ -53,7 +78,29 @@
       <button class="incident" onclick={() => push(`/incidents/${incident.id}`)}>
         <div class="incident-header">
           <span class="impact-dot" style="background: {impactColor(incident.impact)}"></span>
-          <span class="incident-name">{incident.name}</span>
+          <span class="incident-name">{getDisplayName(incident)}</span>
+          {#if isTranslated(incident.id)}
+            <button
+              class="translate-btn translated"
+              onclick={(e) => toggleOriginal(e, incident.id)}
+              aria-label={t('translate.showOriginal')}
+            >
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+              </svg>
+              <span class="translate-badge">{t('translate.aiTranslated')}</span>
+            </button>
+          {:else if isKorean && showOriginal[incident.id]}
+            <button
+              class="translate-btn"
+              onclick={(e) => toggleOriginal(e, incident.id)}
+              aria-label={t('translate.button')}
+            >
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+              </svg>
+            </button>
+          {/if}
         </div>
         <div class="incident-meta">
           <span class="status-badge" style="color: {statusBadgeColor(incident.status)}">{incident.status}</span>
@@ -62,6 +109,7 @@
       </button>
     {/each}
   {/if}
+  <div class="translate-announce" aria-live="polite"></div>
 </div>
 
 <style>
@@ -173,6 +221,66 @@
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
     color: var(--text-secondary);
+  }
+
+  .translate-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(96, 165, 250, 0.4);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    transition: color 200ms;
+  }
+
+  .translate-btn:hover {
+    color: var(--accent);
+  }
+
+  .translate-btn.loading {
+    animation: sparkle-pulse 1s ease-in-out infinite;
+  }
+
+  .translate-btn.translated {
+    color: var(--accent);
+    width: auto;
+    gap: 4px;
+  }
+
+  .translate-btn.error {
+    color: var(--status-critical);
+  }
+
+  .translate-badge {
+    font-family: 'Geist Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(96, 165, 250, 0.2);
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  .incident-name.translated {
+    transition: opacity 200ms;
+  }
+
+  .translate-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  @keyframes sparkle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   @media (max-width: 768px) {

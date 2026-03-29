@@ -1,8 +1,8 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import { getMaintenanceById, getMaintenanceHistory } from '../api';
-  import type { Maintenance, MaintenanceSnapshotResponse } from '../types';
+  import { t, getLocale } from '../i18n';
+  import { getMaintenanceById, getMaintenanceHistory, getTranslation } from '../api';
+  import type { Maintenance, MaintenanceSnapshotResponse, TranslationResponse } from '../types';
 
   interface Props {
     params: { id: string };
@@ -14,6 +14,18 @@
   let history: MaintenanceSnapshotResponse[] = $state([]);
   let loading = $state(true);
   let error = $state('');
+  const isKorean = getLocale() === 'ko';
+  let translation: TranslationResponse | null = $state(null);
+
+  function getTitle(): string {
+    if (isKorean && translation) return translation.translated_name;
+    return maintenance?.name ?? '';
+  }
+
+  function getDescription(): string {
+    if (isKorean && translation && translation.translated_body) return translation.translated_body;
+    return maintenance?.description ?? '';
+  }
 
   $effect(() => {
     loadMaintenance(params.id);
@@ -21,6 +33,7 @@
 
   async function loadMaintenance(id: string) {
     loading = true;
+    translation = null;
     try {
       const [mData, histData] = await Promise.all([
         getMaintenanceById(id),
@@ -29,6 +42,12 @@
       maintenance = mData;
       history = histData;
       error = '';
+
+      if (isKorean) {
+        getTranslation('maintenance', id, 'ko')
+          .then(result => { translation = result; })
+          .catch(() => {});
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     }
@@ -89,7 +108,7 @@
     <div class="detail-header">
       <div class="title-row">
         <span class="status-dot" style="background: {statusColor(maintenance.status)}"></span>
-        <h1>{maintenance.name}</h1>
+        <h1>{getTitle()}</h1>
       </div>
       <div class="meta-row">
         <span class="status-tag" style="color: {statusColor(maintenance.status)}">
@@ -105,7 +124,7 @@
     {#if maintenance.description}
       <div class="section">
         <h2>{t('maintenance.description')}</h2>
-        <p class="description">{maintenance.description}</p>
+        <p class="description">{getDescription()}</p>
       </div>
     {/if}
 
@@ -140,6 +159,12 @@
     max-width: 900px;
     margin: 0 auto;
     min-height: calc(100vh - 56px);
+  }
+
+  @media (min-width: 1600px) {
+    .page {
+      max-width: 1100px;
+    }
   }
 
   .page-header { margin-bottom: 24px; }

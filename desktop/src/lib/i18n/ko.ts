@@ -94,6 +94,13 @@ export default {
   'insight.basis': '24시간 기준',
   'insight.ariaLabel': 'AI 서버 상태 분석',
 
+  // Translation
+  'translate.button': '한국어로 번역',
+  'translate.aiTranslated': 'AI 번역',
+  'translate.loading': '번역 중...',
+  'translate.error': '번역 실패',
+  'translate.showOriginal': '원문 보기',
+
   // Error
   'error.retry': '재시도',
   'error.connectionLost': '연결 끊김',

@@ -29,6 +29,13 @@ struct StatusFilterQuery {
     status: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct TranslateQuery {
+    r#type: String,
+    id: String,
+    locale: Option<String>,
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -109,9 +116,22 @@ async fn main() {
 
     info!("Collector started");
 
-    let state = Arc::new(AppState {
-        service: VrcPulseService::new(database),
-    });
+    let service = VrcPulseService::new(database).with_gemini_key(api_key.clone());
+
+    // Pre-translate existing content in background
+    {
+        let pre_translate_service =
+            VrcPulseService::new(service.db_ref().clone()).with_gemini_key(api_key);
+        tokio::spawn(async move {
+            // Wait for collector + initial AI insight analysis to complete before starting translations.
+            // Collector needs ~5s, AI insight starts at 10s and takes ~20s (analysis + translation).
+            // Starting at 60s avoids Gemini API rate conflicts.
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            pre_translate_service.pre_translate_all().await;
+        });
+    }
+
+    let state = Arc::new(AppState { service });
 
     // Build router
     let api_routes = Router::new()
@@ -129,7 +149,8 @@ async fn main() {
             "/maintenances/history/{maintenance_id}",
             get(get_maintenance_history),
         )
-        .route("/insights/latest", get(get_insights_latest));
+        .route("/insights/latest", get(get_insights_latest))
+        .route("/translate", get(get_translate));
 
     let app = Router::new()
         .nest("/api", api_routes)
@@ -243,5 +264,24 @@ async fn get_maintenances(
     match state.service.get_maintenances(status).await {
         Ok(data) => Json(data).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_translate(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<TranslateQuery>,
+) -> impl IntoResponse {
+    let locale = params.locale.as_deref().unwrap_or("ko");
+    match state
+        .service
+        .translate_content(&params.r#type, &params.id, locale)
+        .await
+    {
+        Ok(data) => Json(data).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e })),
+        )
+            .into_response(),
     }
 }

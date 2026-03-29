@@ -27,6 +27,22 @@ pub enum InsightError {
     ApiError { status: u16, body: String },
 }
 
+/// Translation response for incident/maintenance text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranslationResult {
+    pub name: String,
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
+    pub updates: Vec<TranslatedUpdate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranslatedUpdate {
+    pub update_id: String,
+    pub translated_body: String,
+}
+
 /// Structured response from Gemini, matching the responseSchema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InsightResponse {
@@ -89,6 +105,68 @@ impl GeminiClient {
         korean.severity = english_insight.severity.clone();
 
         Ok(korean)
+    }
+
+    /// Translate incident/maintenance content to the target locale.
+    pub async fn translate_content(
+        &self,
+        name: &str,
+        body: &str,
+        updates: &[(String, String)], // (update_id, body)
+        target_locale: &str,
+    ) -> Result<TranslationResult, InsightError> {
+        let request_body = build_content_translation_body(name, body, updates, target_locale);
+
+        debug!(model = %self.model, locale = target_locale, "Sending content translation request to Gemini API");
+
+        let raw = self
+            .call_gemini_raw(&request_body, TRANSLATION_TIMEOUT_SECS)
+            .await?;
+
+        serde_json::from_str(&raw)
+            .map_err(|e| InsightError::ParseFailed(format!("JSON parse error: {e}, text: {raw}")))
+    }
+
+    /// Low-level Gemini call that returns the raw text from the response.
+    async fn call_gemini_raw(
+        &self,
+        request_body: &serde_json::Value,
+        timeout_secs: u64,
+    ) -> Result<String, InsightError> {
+        let url = format!(
+            "{}/{}:generateContent?key={}",
+            GEMINI_API_BASE, self.model, self.api_key
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .json(request_body)
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .send()
+            .await?;
+
+        let status = response.status().as_u16();
+        match status {
+            200 => {}
+            401 | 403 => return Err(InsightError::InvalidKey),
+            429 => return Err(InsightError::RateLimited),
+            _ => {
+                let body = response.text().await.unwrap_or_default();
+                return Err(InsightError::ApiError { status, body });
+            }
+        }
+
+        let gemini_response: serde_json::Value = response.json().await?;
+        gemini_response["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                InsightError::ParseFailed(format!(
+                    "Missing text in Gemini response: {}",
+                    serde_json::to_string_pretty(&gemini_response).unwrap_or_default()
+                ))
+            })
     }
 
     async fn call_gemini(
@@ -219,6 +297,78 @@ fn build_translation_request_body(
             }
         }
     }))
+}
+
+fn build_content_translation_body(
+    name: &str,
+    body: &str,
+    updates: &[(String, String)],
+    target_locale: &str,
+) -> serde_json::Value {
+    let locale_name = match target_locale {
+        "ko" => "Korean",
+        "ja" => "Japanese",
+        _ => target_locale,
+    };
+
+    let updates_json: Vec<serde_json::Value> = updates
+        .iter()
+        .map(|(id, text)| {
+            serde_json::json!({
+                "update_id": id,
+                "body": text
+            })
+        })
+        .collect();
+
+    let source = serde_json::json!({
+        "name": name,
+        "body": body,
+        "updates": updates_json
+    });
+
+    serde_json::json!({
+        "contents": [{
+            "parts": [{
+                "text": format!(
+                    "Translate the following VRChat server status text to {locale_name}. \
+                     Maintain technical terms (e.g. Steam, API, Oculus). \
+                     Use a neutral, informative tone suitable for a status monitoring dashboard. \
+                     Return the translated fields in the specified JSON structure.\n\n{}",
+                    serde_json::to_string(&source).unwrap_or_default()
+                )
+            }]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Translated title"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Translated body/description"
+                    },
+                    "updates": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "update_id": { "type": "string" },
+                                "translated_body": { "type": "string" }
+                            },
+                            "required": ["update_id", "translated_body"]
+                        },
+                        "description": "Translated status updates"
+                    }
+                },
+                "required": ["name"]
+            }
+        }
+    })
 }
 
 fn parse_gemini_response(response: &serde_json::Value) -> Result<InsightResponse, InsightError> {

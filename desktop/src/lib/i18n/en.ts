@@ -94,6 +94,13 @@ export default {
   'insight.basis': '24-hour basis',
   'insight.ariaLabel': 'AI Server Status Analysis',
 
+  // Translation
+  'translate.button': 'Translate to Korean',
+  'translate.aiTranslated': 'AI Translated',
+  'translate.loading': 'Translating...',
+  'translate.error': 'Translation failed',
+  'translate.showOriginal': 'Show original',
+
   // Error
   'error.retry': 'Retry',
   'error.connectionLost': 'Connection lost',

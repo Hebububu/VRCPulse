@@ -1,17 +1,36 @@
 use chrono::{Duration, Utc};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
-use serde::Serialize;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::entity::{
     ai_insights, incident_snapshots, incident_updates, incidents, maintenance_snapshots,
-    maintenances, status_logs,
+    maintenances, status_logs, translations,
 };
-use crate::insight::gemini_client::InsightResponse;
+use crate::insight::gemini_client::{GeminiClient, InsightResponse};
 use crate::query::{self, MetricData};
+
+/// Response from the translation endpoint.
+#[derive(Debug, Serialize, Clone)]
+pub struct TranslationResponse {
+    pub translated_name: String,
+    pub translated_body: String,
+    pub translated_updates: Vec<TranslatedUpdateResponse>,
+    pub cached: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TranslatedUpdateResponse {
+    pub update_id: String,
+    pub translated_body: String,
+}
 
 /// Shared service layer used by both Tauri commands and Axum handlers.
 pub struct VrcPulseService {
     db: DatabaseConnection,
+    gemini_api_key: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -47,6 +66,7 @@ pub struct IncidentResponse {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct IncidentUpdateResponse {
+    pub id: String,
     pub status: String,
     pub body: String,
     pub created_at: String,
@@ -148,7 +168,19 @@ fn metric_data_to_response(name: &str, data: MetricData) -> MetricResponse {
 
 impl VrcPulseService {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+        Self {
+            db,
+            gemini_api_key: None,
+        }
+    }
+
+    pub fn with_gemini_key(mut self, key: Option<String>) -> Self {
+        self.gemini_api_key = key;
+        self
+    }
+
+    pub fn db_ref(&self) -> &DatabaseConnection {
+        &self.db
     }
 
     pub async fn get_status(&self) -> Result<StatusResponse, sea_orm::DbErr> {
@@ -250,6 +282,7 @@ impl VrcPulseService {
                 updates: updates
                     .into_iter()
                     .map(|u| IncidentUpdateResponse {
+                        id: u.id.clone(),
                         status: u.status,
                         body: u.body,
                         created_at: u.published_at.to_rfc3339(),
@@ -371,6 +404,7 @@ impl VrcPulseService {
                             arr.iter()
                                 .filter_map(|u| {
                                     Some(IncidentUpdateResponse {
+                                        id: u["id"].as_str().unwrap_or("").to_string(),
                                         status: u["status"].as_str()?.to_string(),
                                         body: u["body"].as_str()?.to_string(),
                                         created_at: u["created_at"].as_str()?.to_string(),
@@ -491,6 +525,291 @@ impl VrcPulseService {
             })
             .collect())
     }
+
+    /// Translate incident or maintenance content.
+    /// Checks DB cache first; on miss, calls Gemini and stores the result.
+    pub async fn translate_content(
+        &self,
+        item_type: &str,
+        item_id: &str,
+        locale: &str,
+    ) -> Result<TranslationResponse, String> {
+        // 1. Fetch source content
+        let (name, body, updates) = match item_type {
+            "incident" => self.get_incident_content(item_id).await?,
+            "maintenance" => self.get_maintenance_content(item_id).await?,
+            _ => return Err("Invalid item_type. Use 'incident' or 'maintenance'.".to_string()),
+        };
+
+        // 2. Compute content hash
+        let content_hash = compute_content_hash(&name, &body, &updates);
+
+        // 3. Check DB cache
+        let cached = translations::Entity::find()
+            .filter(translations::Column::ItemType.eq(item_type))
+            .filter(translations::Column::ItemId.eq(item_id))
+            .filter(translations::Column::Locale.eq(locale))
+            .one(&self.db)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if let Some(ref row) = cached
+            && row.content_hash == content_hash
+        {
+            let updates: Vec<TranslatedUpdateResponse> =
+                serde_json::from_str(&row.translated_updates).unwrap_or_default();
+            return Ok(TranslationResponse {
+                translated_name: row.translated_name.clone(),
+                translated_body: row.translated_body.clone(),
+                translated_updates: updates,
+                cached: true,
+            });
+        }
+
+        // 4. Call Gemini
+        let api_key = self
+            .gemini_api_key
+            .as_ref()
+            .ok_or("GOOGLE_AI_STUDIO_API_KEY not configured")?;
+
+        let client = GeminiClient::new(
+            reqwest::Client::new(),
+            api_key.clone(),
+            crate::insight::MODEL_ID,
+        );
+
+        let update_pairs: Vec<(String, String)> = updates
+            .iter()
+            .map(|(id, body)| (id.clone(), body.clone()))
+            .collect();
+
+        let result = client
+            .translate_content(&name, &body, &update_pairs, locale)
+            .await
+            .map_err(|e| format!("Translation failed: {e}"))?;
+
+        // 5. Upsert into DB
+        let now = Utc::now();
+        let translated_updates_json = serde_json::to_string(
+            &result
+                .updates
+                .iter()
+                .map(|u| TranslatedUpdateResponse {
+                    update_id: u.update_id.clone(),
+                    translated_body: u.translated_body.clone(),
+                })
+                .collect::<Vec<_>>(),
+        )
+        .unwrap_or_else(|_| "[]".to_string());
+
+        if let Some(existing) = cached {
+            // Update existing row
+            let mut active: translations::ActiveModel = existing.into();
+            active.content_hash = Set(content_hash);
+            active.translated_name = Set(result.name.clone());
+            active.translated_body = Set(result.body.clone());
+            active.translated_updates = Set(translated_updates_json.clone());
+            active.updated_at = Set(now);
+            active.update(&self.db).await.map_err(|e| e.to_string())?;
+        } else {
+            // Insert new row
+            let active = translations::ActiveModel {
+                item_type: Set(item_type.to_string()),
+                item_id: Set(item_id.to_string()),
+                locale: Set(locale.to_string()),
+                content_hash: Set(content_hash),
+                translated_name: Set(result.name.clone()),
+                translated_body: Set(result.body.clone()),
+                translated_updates: Set(translated_updates_json.clone()),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+            active.insert(&self.db).await.map_err(|e| e.to_string())?;
+        }
+
+        let response_updates: Vec<TranslatedUpdateResponse> = result
+            .updates
+            .into_iter()
+            .map(|u| TranslatedUpdateResponse {
+                update_id: u.update_id,
+                translated_body: u.translated_body,
+            })
+            .collect();
+
+        Ok(TranslationResponse {
+            translated_name: result.name,
+            translated_body: result.body,
+            translated_updates: response_updates,
+            cached: false,
+        })
+    }
+
+    async fn get_incident_content(
+        &self,
+        incident_id: &str,
+    ) -> Result<(String, String, Vec<(String, String)>), String> {
+        // Get latest snapshot
+        let snapshot = incident_snapshots::Entity::find()
+            .filter(incident_snapshots::Column::IncidentId.eq(incident_id))
+            .order_by_desc(incident_snapshots::Column::FetchedAt)
+            .one(&self.db)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Incident {incident_id} not found"))?;
+
+        let name = snapshot.title;
+        let body = String::new(); // Incidents don't have a top-level body
+
+        // Parse updates from raw_json
+        let updates =
+            if let Ok(incident) = serde_json::from_str::<serde_json::Value>(&snapshot.raw_json) {
+                incident["incident_updates"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|u| {
+                                let id = u["id"]
+                                    .as_str()
+                                    .or_else(|| u["created_at"].as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let body = u["body"].as_str().unwrap_or("").to_string();
+                                if body.is_empty() {
+                                    None
+                                } else {
+                                    Some((id, body))
+                                }
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+
+        Ok((name, body, updates))
+    }
+
+    async fn get_maintenance_content(
+        &self,
+        maintenance_id: &str,
+    ) -> Result<(String, String, Vec<(String, String)>), String> {
+        let m = maintenances::Entity::find_by_id(maintenance_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Maintenance {maintenance_id} not found"))?;
+
+        Ok((m.title, m.description, Vec::new()))
+    }
+
+    /// Pre-translate all incidents and maintenances to Korean.
+    /// Translates most recent items first, with delays between requests to avoid rate limiting.
+    pub async fn pre_translate_all(&self) {
+        use tokio::time::{Duration, sleep};
+        use tracing::{debug, info, warn};
+
+        const DELAY_BETWEEN_REQUESTS: Duration = Duration::from_secs(8);
+        const RATE_LIMIT_PAUSE: Duration = Duration::from_secs(120);
+
+        if self.gemini_api_key.is_none() {
+            warn!("Skipping pre-translation: no Gemini API key");
+            return;
+        }
+
+        info!("Starting pre-translation of incidents and maintenances to Korean");
+
+        // Collect unique incident IDs (most recent first)
+        let snapshots = incident_snapshots::Entity::find()
+            .order_by_desc(incident_snapshots::Column::FetchedAt)
+            .all(&self.db)
+            .await
+            .unwrap_or_default();
+
+        let mut seen = std::collections::HashSet::new();
+        let incident_ids: Vec<String> = snapshots
+            .iter()
+            .filter(|s| seen.insert(s.incident_id.clone()))
+            .take(20)
+            .map(|s| s.incident_id.clone())
+            .collect();
+
+        // Collect maintenance IDs (most recent scheduled first)
+        let maint_ids: Vec<String> = maintenances::Entity::find()
+            .order_by_desc(maintenances::Column::ScheduledFor)
+            .all(&self.db)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .take(10)
+            .map(|m| m.id)
+            .collect();
+
+        // Interleave: translate newest incident, then newest maintenance, alternating
+        let max_len = incident_ids.len().max(maint_ids.len());
+        for i in 0..max_len {
+            // Incident
+            if let Some(id) = incident_ids.get(i) {
+                let result: Result<TranslationResponse, String> =
+                    self.translate_content("incident", id, "ko").await;
+                match result {
+                    Ok(r) if r.cached => {
+                        debug!(incident_id = %id, "Incident translation already cached");
+                    }
+                    Ok(r) => {
+                        info!(incident_id = %id, name = %r.translated_name, "Pre-translated incident");
+                        sleep(DELAY_BETWEEN_REQUESTS).await;
+                    }
+                    Err(e) => {
+                        let rate_limited = e.contains("Rate limited");
+                        warn!(incident_id = %id, "Failed to pre-translate incident: {e}");
+                        if rate_limited {
+                            info!("Rate limited, pausing pre-translation for 60s");
+                            sleep(RATE_LIMIT_PAUSE).await;
+                        }
+                    }
+                }
+            }
+
+            // Maintenance
+            if let Some(id) = maint_ids.get(i) {
+                let result: Result<TranslationResponse, String> =
+                    self.translate_content("maintenance", id, "ko").await;
+                match result {
+                    Ok(r) if r.cached => {
+                        debug!(maintenance_id = %id, "Maintenance translation already cached");
+                    }
+                    Ok(r) => {
+                        info!(maintenance_id = %id, name = %r.translated_name, "Pre-translated maintenance");
+                        sleep(DELAY_BETWEEN_REQUESTS).await;
+                    }
+                    Err(e) => {
+                        let rate_limited = e.contains("Rate limited");
+                        warn!(maintenance_id = %id, "Failed to pre-translate maintenance: {e}");
+                        if rate_limited {
+                            info!("Rate limited, pausing pre-translation for 60s");
+                            sleep(RATE_LIMIT_PAUSE).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        info!("Pre-translation complete");
+    }
+}
+
+fn compute_content_hash(name: &str, body: &str, updates: &[(String, String)]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(name.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(body.as_bytes());
+    for (_, update_body) in updates {
+        hasher.update(b"\n");
+        hasher.update(update_body.as_bytes());
+    }
+    format!("{:x}", hasher.finalize())
 }
 
 #[cfg(test)]

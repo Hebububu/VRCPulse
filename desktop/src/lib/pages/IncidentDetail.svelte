@@ -1,8 +1,8 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import { getIncidents, getIncidentHistory } from '../api';
-  import type { Incident, IncidentSnapshotResponse } from '../types';
+  import { t, getLocale } from '../i18n';
+  import { getIncidents, getIncidentHistory, getTranslation } from '../api';
+  import type { Incident, IncidentSnapshotResponse, TranslationResponse } from '../types';
 
   interface Props {
     params: { id: string };
@@ -15,12 +15,42 @@
   let loading = $state(true);
   let error = $state('');
 
+  // Translation state
+  const isKorean = getLocale() === 'ko';
+  let translation: TranslationResponse | null = $state(null);
+  let showOriginal = $state(false);
+
+  function toggleOriginal() {
+    showOriginal = !showOriginal;
+  }
+
+  function getTitle(): string {
+    if (isKorean && translation && !showOriginal) return translation.translated_name;
+    return incident?.name ?? '';
+  }
+
+  function isTranslated(): boolean {
+    return isKorean && !!translation && !showOriginal;
+  }
+
+  function getUpdateBody(update: { id: string; body: string }): string {
+    if (isKorean && translation && !showOriginal) {
+      const match = translation.translated_updates.find(
+        u => u.update_id === update.id
+      );
+      if (match) return match.translated_body;
+    }
+    return update.body;
+  }
+
   $effect(() => {
     loadIncident(params.id);
   });
 
   async function loadIncident(id: string) {
     loading = true;
+    translation = null;
+    showOriginal = false;
     try {
       const [incData, histData] = await Promise.all([
         getIncidents('all'),
@@ -29,6 +59,13 @@
       incident = incData.incidents.find(i => i.id === id) ?? null;
       history = histData;
       error = '';
+
+      // Auto-fetch translation for Korean locale
+      if (isKorean && incident) {
+        getTranslation('incident', incident.id, 'ko')
+          .then(result => { translation = result; })
+          .catch(() => {});
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     }
@@ -98,7 +135,29 @@
     <div class="incident-header">
       <div class="title-row">
         <span class="impact-dot" style="background: {impactColor(incident.impact)}"></span>
-        <h1>{incident.name}</h1>
+        <h1>{getTitle()}</h1>
+        {#if isTranslated()}
+          <button
+            class="translate-btn translated"
+            onclick={toggleOriginal}
+            aria-label={t('translate.showOriginal')}
+          >
+            <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor">
+              <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+            </svg>
+            <span class="translate-badge">{t('translate.aiTranslated')}</span>
+          </button>
+        {:else if isKorean && showOriginal}
+          <button
+            class="translate-btn"
+            onclick={toggleOriginal}
+            aria-label={t('translate.button')}
+          >
+            <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor">
+              <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
+            </svg>
+          </button>
+        {/if}
       </div>
       <div class="meta-row">
         <span class="status-tag" style="color: {statusColor(incident.status)}">{incident.status}</span>
@@ -127,7 +186,7 @@
                   <span class="update-status" style="color: {statusColor(update.status)}">{update.status}</span>
                   <span class="update-time">{formatDateTime(update.created_at)}</span>
                 </div>
-                <p class="update-body">{update.body}</p>
+                <p class="update-body">{getUpdateBody(update)}</p>
               </div>
             </div>
           {/each}
@@ -168,6 +227,12 @@
     min-height: calc(100vh - 56px);
   }
 
+  @media (min-width: 1600px) {
+    .page {
+      max-width: 1100px;
+    }
+  }
+
   .page-header {
     margin-bottom: 24px;
   }
@@ -193,6 +258,35 @@
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
+  }
+
+  .translate-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: rgba(96, 165, 250, 0.4);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4px;
+    transition: color 200ms;
+  }
+  .translate-btn:hover { color: var(--accent); }
+  .translate-btn.loading { animation: sparkle-pulse 1s ease-in-out infinite; }
+  .translate-btn.translated { color: var(--accent); }
+  .translate-btn.error { color: #ef4444; }
+  .translate-badge {
+    font-family: 'Geist Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(96, 165, 250, 0.2);
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  @keyframes sparkle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   .impact-dot {

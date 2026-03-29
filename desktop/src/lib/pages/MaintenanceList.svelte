@@ -1,13 +1,15 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import { getMaintenances } from '../api';
-  import type { Maintenance } from '../types';
+  import { t, getLocale } from '../i18n';
+  import { getMaintenances, getTranslation } from '../api';
+  import type { Maintenance, TranslationResponse } from '../types';
 
   let maintenances: Maintenance[] = $state([]);
   let loading = $state(true);
   let error = $state('');
   let filter = $state('all');
+  const isKorean = getLocale() === 'ko';
+  let translations: Record<string, TranslationResponse> = $state({});
 
   async function fetchData() {
     loading = true;
@@ -15,10 +17,27 @@
       const data = await getMaintenances(filter === 'upcoming' ? 'upcoming' : filter);
       maintenances = data.maintenances;
       error = '';
+      if (isKorean) fetchTranslations(data.maintenances);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     }
     loading = false;
+  }
+
+  async function fetchTranslations(items: Maintenance[]) {
+    const updated = { ...translations };
+    for (const m of items.slice(0, 20)) {
+      if (updated[m.id]) continue;
+      try {
+        updated[m.id] = await getTranslation('maintenance', m.id, 'ko');
+        translations = { ...updated };
+      } catch { break; }
+    }
+  }
+
+  function getName(m: Maintenance): string {
+    if (isKorean && translations[m.id]) return translations[m.id].translated_name;
+    return m.name;
   }
 
   $effect(() => {
@@ -76,7 +95,7 @@
           <div class="row-left">
             <span class="status-dot" style="background: {statusColor(m.status)}"></span>
             <div class="row-info">
-              <span class="row-name">{m.name}</span>
+              <span class="row-name">{getName(m)}</span>
               <span class="row-date">{formatDate(m.scheduled_for)} {formatTime(m.scheduled_for)} — {formatTime(m.scheduled_until)} UTC</span>
             </div>
           </div>

@@ -208,7 +208,7 @@ fn compute_metric_feature(
 
     // Use average of last 5 data points (~5 min) instead of single last value
     // to avoid spiky outliers skewing the analysis
-    let recent_window: Vec<f64> = values_24h.iter().rev().take(5).map(|d| *d).collect();
+    let recent_window: Vec<f64> = values_24h.iter().rev().take(5).copied().collect();
     let current = if recent_window.is_empty() {
         0.0
     } else {
@@ -257,36 +257,39 @@ fn compute_co_occurrences(metrics: &[MetricFeature]) -> Vec<CoOccurrence> {
     let find = |name: &str| -> Option<&MetricFeature> { metrics.iter().find(|m| m.name == name) };
 
     // api_errors + extauth_steam/oculus anomaly → auth failure correlation
-    if let (Some(errors), Some(steam)) = (find("api_errors"), find("extauth_steam")) {
-        if errors.anomaly && steam.anomaly {
-            co_occs.push(CoOccurrence {
-                metric_a: "api_errors".to_string(),
-                metric_b: "extauth_steam".to_string(),
-                flag: "auth_failure_correlated".to_string(),
-            });
-        }
+    if let (Some(errors), Some(steam)) = (find("api_errors"), find("extauth_steam"))
+        && errors.anomaly
+        && steam.anomaly
+    {
+        co_occs.push(CoOccurrence {
+            metric_a: "api_errors".to_string(),
+            metric_b: "extauth_steam".to_string(),
+            flag: "auth_failure_correlated".to_string(),
+        });
     }
 
     // visits down + api_requests stable → login churn
-    if let (Some(visits), Some(requests)) = (find("visits"), find("api_requests")) {
-        if visits.delta_percent_1h < -10.0 && requests.delta_percent_1h.abs() < 10.0 {
-            co_occs.push(CoOccurrence {
-                metric_a: "visits".to_string(),
-                metric_b: "api_requests".to_string(),
-                flag: "login_churn".to_string(),
-            });
-        }
+    if let (Some(visits), Some(requests)) = (find("visits"), find("api_requests"))
+        && visits.delta_percent_1h < -10.0
+        && requests.delta_percent_1h.abs() < 10.0
+    {
+        co_occs.push(CoOccurrence {
+            metric_a: "visits".to_string(),
+            metric_b: "api_requests".to_string(),
+            flag: "login_churn".to_string(),
+        });
     }
 
     // api_latency anomaly + api_errors up → degradation
-    if let (Some(latency), Some(errors)) = (find("api_latency"), find("api_errors")) {
-        if latency.anomaly && errors.delta_percent_1h > 20.0 {
-            co_occs.push(CoOccurrence {
-                metric_a: "api_latency".to_string(),
-                metric_b: "api_errors".to_string(),
-                flag: "degradation".to_string(),
-            });
-        }
+    if let (Some(latency), Some(errors)) = (find("api_latency"), find("api_errors"))
+        && latency.anomaly
+        && errors.delta_percent_1h > 20.0
+    {
+        co_occs.push(CoOccurrence {
+            metric_a: "api_latency".to_string(),
+            metric_b: "api_errors".to_string(),
+            flag: "degradation".to_string(),
+        });
     }
 
     co_occs

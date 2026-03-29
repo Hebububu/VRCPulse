@@ -19,7 +19,7 @@ use gemini_client::InsightResponse;
 use gemini_client::{GeminiClient, InsightError};
 
 const ANALYSIS_INTERVAL_SECS: u64 = 3600; // 1 hour
-const MODEL_ID: &str = "gemini-3.1-flash-lite-preview";
+pub const MODEL_ID: &str = "gemini-3.1-flash-lite-preview";
 
 /// Trigger types for the analysis task.
 #[derive(Debug, Clone)]
@@ -68,6 +68,7 @@ pub async fn run_analysis_task(
         .build()
         .expect("Failed to create HTTP client for insight");
 
+    let translate_api_key = api_key.clone();
     let client = GeminiClient::new(http_client, api_key, MODEL_ID);
     let mut ticker = interval(Duration::from_secs(ANALYSIS_INTERVAL_SECS));
 
@@ -103,6 +104,34 @@ pub async fn run_analysis_task(
             Ok(true) => {
                 info!(trigger = ?trigger.trigger_type(), "Analysis completed and stored");
                 initial = false;
+
+                // Auto-translate newly detected incidents/maintenances
+                match &trigger {
+                    InsightTrigger::IncidentDetected { incident_id, .. } => {
+                        let svc = crate::service::VrcPulseService::new(db.clone())
+                            .with_gemini_key(Some(translate_api_key.clone()));
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        if let Err(e) = svc.translate_content("incident", incident_id, "ko").await {
+                            warn!("Auto-translate incident failed: {e}");
+                        } else {
+                            info!(incident_id = %incident_id, "Auto-translated new incident");
+                        }
+                    }
+                    InsightTrigger::MaintenanceDetected { maintenance_id } => {
+                        let svc = crate::service::VrcPulseService::new(db.clone())
+                            .with_gemini_key(Some(translate_api_key.clone()));
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        if let Err(e) = svc
+                            .translate_content("maintenance", maintenance_id, "ko")
+                            .await
+                        {
+                            warn!("Auto-translate maintenance failed: {e}");
+                        } else {
+                            info!(maintenance_id = %maintenance_id, "Auto-translated new maintenance");
+                        }
+                    }
+                    _ => {}
+                }
             }
             Ok(false) => {
                 if initial {
@@ -153,30 +182,30 @@ async fn run_single_analysis(
     // Step 2: Check dedup for scheduled triggers (English hash only)
     let source_hash = compute_source_hash(trigger.trigger_type(), trigger.trigger_id(), &snapshot);
 
-    if matches!(trigger, InsightTrigger::Scheduled) {
-        if let Ok(true) = hash_exists(db, &source_hash).await {
-            // Check if the latest cycle has both languages before skipping
-            if let Ok(true) = latest_cycle_complete(db).await {
-                debug!("Skipping analysis: source_hash unchanged and both languages present");
-                return Ok(false);
-            }
-            // English exists but Korean missing — retry translation only
-            if let Some((en_insight, cycle_id)) = get_latest_english_only_cycle(db).await? {
-                debug!("Source hash unchanged, retrying Korean translation only");
-                translate_and_store(
-                    db,
-                    client,
-                    trigger,
-                    &snapshot,
-                    &en_insight,
-                    &source_hash,
-                    &cycle_id,
-                )
-                .await;
-                return Ok(true);
-            }
-            debug!("Source hash unchanged but translation missing, regenerating");
+    if matches!(trigger, InsightTrigger::Scheduled)
+        && let Ok(true) = hash_exists(db, &source_hash).await
+    {
+        // Check if the latest cycle has both languages before skipping
+        if let Ok(true) = latest_cycle_complete(db).await {
+            debug!("Skipping analysis: source_hash unchanged and both languages present");
+            return Ok(false);
         }
+        // English exists but Korean missing — retry translation only
+        if let Some((en_insight, cycle_id)) = get_latest_english_only_cycle(db).await? {
+            debug!("Source hash unchanged, retrying Korean translation only");
+            translate_and_store(
+                db,
+                client,
+                trigger,
+                &snapshot,
+                &en_insight,
+                &source_hash,
+                &cycle_id,
+            )
+            .await;
+            return Ok(true);
+        }
+        debug!("Source hash unchanged but translation missing, regenerating");
     }
 
     // Step 3: Generate cycle_id

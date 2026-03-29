@@ -1,13 +1,15 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
-  import { t } from '../i18n';
-  import { getIncidents } from '../api';
-  import type { Incident } from '../types';
+  import { t, getLocale } from '../i18n';
+  import { getIncidents, getTranslation } from '../api';
+  import type { Incident, TranslationResponse } from '../types';
 
   let incidents: Incident[] = $state([]);
   let loading = $state(true);
   let error = $state('');
   let filter = $state('all');
+  const isKorean = getLocale() === 'ko';
+  let translations: Record<string, TranslationResponse> = $state({});
 
   async function fetchIncidents() {
     loading = true;
@@ -15,10 +17,27 @@
       const data = await getIncidents(filter);
       incidents = data.incidents;
       error = '';
+      if (isKorean) fetchTranslations(data.incidents);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     }
     loading = false;
+  }
+
+  async function fetchTranslations(incs: Incident[]) {
+    const updated = { ...translations };
+    for (const inc of incs.slice(0, 20)) {
+      if (updated[inc.id]) continue;
+      try {
+        updated[inc.id] = await getTranslation('incident', inc.id, 'ko');
+        translations = { ...updated };
+      } catch { break; }
+    }
+  }
+
+  function getName(inc: Incident): string {
+    if (isKorean && translations[inc.id]) return translations[inc.id].translated_name;
+    return inc.name;
   }
 
   $effect(() => {
@@ -86,7 +105,7 @@
           <div class="incident-left">
             <span class="impact-dot" style="background: {impactColor(incident.impact)}"></span>
             <div class="incident-info">
-              <span class="incident-name">{incident.name}</span>
+              <span class="incident-name">{getName(incident)}</span>
               <span class="incident-date">{formatDate(incident.created_at)} at {formatTime(incident.created_at)}</span>
             </div>
           </div>
