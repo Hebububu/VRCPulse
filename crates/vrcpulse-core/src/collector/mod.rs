@@ -43,9 +43,12 @@ pub async fn start(
         poll_loop_dynamic("incident", config.incident.clone(), || {
             incident::poll(&client, &db)
         }),
-        poll_loop_dynamic("maintenance", config.maintenance.clone(), || {
-            maintenance::poll(&client, &db)
-        }),
+        poll_loop_dynamic_with_maintenance_trigger(
+            "maintenance",
+            config.maintenance.clone(),
+            &insight_tx,
+            || { maintenance::poll(&client, &db) }
+        ),
         poll_loop_dynamic("metrics", config.metrics.clone(), || {
             metrics::poll(&client, &db)
         }),
@@ -89,6 +92,59 @@ async fn poll_loop_dynamic_with_trigger<F, Fut>(
                                         })
                                     }
                                     _ => None,
+                                };
+                                if let Some(t) = trigger {
+                                    let _ = tx.try_send(t);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!(poller = name, error = %e, "Poll failed");
+                    }
+                }
+            }
+            _ = interval_rx.changed() => {
+                let new_duration = *interval_rx.borrow();
+                ticker = create_interval(new_duration);
+                info!(
+                    poller = name,
+                    interval_secs = new_duration.as_secs(),
+                    "Polling interval updated"
+                );
+            }
+        }
+    }
+}
+
+/// Poll loop variant that sends MaintenanceChange events to the insight task.
+async fn poll_loop_dynamic_with_maintenance_trigger<F, Fut>(
+    name: &'static str,
+    mut interval_rx: watch::Receiver<Duration>,
+    insight_tx: &Option<mpsc::Sender<InsightTrigger>>,
+    poll_fn: F,
+) where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = client::Result<Vec<maintenance::MaintenanceChange>>>,
+{
+    let mut ticker = create_interval(*interval_rx.borrow());
+
+    loop {
+        tokio::select! {
+            _ = ticker.tick() => {
+                match poll_fn().await {
+                    Ok(changes) => {
+                        debug!(poller = name, "Polled");
+                        if let Some(tx) = insight_tx {
+                            for change in &changes {
+                                let trigger = match change {
+                                    maintenance::MaintenanceChange::New { maintenance_id, .. }
+                                    | maintenance::MaintenanceChange::StatusChanged { maintenance_id, .. }
+                                    | maintenance::MaintenanceChange::Rescheduled { maintenance_id, .. } => {
+                                        Some(InsightTrigger::MaintenanceDetected {
+                                            maintenance_id: maintenance_id.clone(),
+                                        })
+                                    }
                                 };
                                 if let Some(t) = trigger {
                                     let _ = tx.try_send(t);

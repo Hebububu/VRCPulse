@@ -67,6 +67,32 @@ export default {
   'settings.notifications': '인시던트 알림',
   'settings.notificationsDesc': '새 인시던트 감지 시 네이티브 알림 표시',
 
+  // Maintenance
+  'maintenance.upcoming': '예정된 점검',
+  'maintenance.inProgress': '점검 진행 중',
+  'maintenance.completed': '완료',
+  'maintenance.scheduled': '예정',
+  'maintenance.scheduledFor': '예정 시간',
+  'maintenance.scheduledUntil': '종료 예정',
+  'maintenance.viewAll': '전체 보기',
+  'maintenance.history': '점검 이력',
+  'maintenance.changeHistory': '변경 이력',
+  'maintenance.viewSource': 'status.vrchat.com에서 보기',
+  'maintenance.bannerText': '현재 점검 중',
+  'maintenance.bannerLink': '점검 보러 가기',
+  'maintenance.noRecords': '예정된 점검이 없습니다',
+  'maintenance.recent': '점검',
+  'maintenance.notFound': '점검을 찾을 수 없습니다',
+
+  // AI Insight
+  'insight.confidence.high': '높음',
+  'insight.confidence.medium': '보통',
+  'insight.confidence.low': '낮음',
+  'insight.trustLabel': '신뢰도',
+  'insight.nextAnalysis': '다음 분석',
+  'insight.basis': '24시간 기준',
+  'insight.ariaLabel': 'AI 서버 상태 분석',
+
   // Error
   'error.retry': '재시도',
   'error.connectionLost': '연결 끊김',

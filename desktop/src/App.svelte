@@ -3,12 +3,16 @@
   import DashboardPage from './lib/pages/DashboardPage.svelte';
   import IncidentList from './lib/pages/IncidentList.svelte';
   import IncidentDetail from './lib/pages/IncidentDetail.svelte';
+  import MaintenanceList from './lib/pages/MaintenanceList.svelte';
+  import MaintenanceDetail from './lib/pages/MaintenanceDetail.svelte';
   import Settings from './lib/pages/Settings.svelte';
 
   const routes = {
     '/': DashboardPage,
     '/incidents': IncidentList,
     '/incidents/:id': IncidentDetail,
+    '/maintenances': MaintenanceList,
+    '/maintenances/:id': MaintenanceDetail,
     '/settings': Settings,
   };
 </script>

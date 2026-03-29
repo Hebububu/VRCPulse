@@ -1,13 +1,23 @@
 <script lang="ts">
   import { Sparkle } from 'phosphor-svelte';
   import { onDestroy } from 'svelte';
-  import type { AiInsightResponse } from '../types';
+  import type { AiInsightResponse, InsightBundle } from '../types';
+  import { getLocale } from '../i18n';
+  import { t } from '../i18n';
 
   interface Props {
-    insight: AiInsightResponse | null;
+    bundle: InsightBundle | null;
   }
 
-  let { insight }: Props = $props();
+  let { bundle }: Props = $props();
+
+  let insight = $derived.by(() => {
+    if (!bundle) return null;
+    const locale = getLocale();
+    if (locale === 'ko') return bundle.ko ?? bundle.en;
+    return bundle.en ?? bundle.ko;
+  });
+
   let prevInsightId = $state<number | null>(null);
   let streaming = $state(false);
   let activeTimers: ReturnType<typeof setTimeout>[] = [];
@@ -112,9 +122,9 @@
   }
 
   function confidenceLabel(value: number): string {
-    if (value >= 0.8) return '높음';
-    if (value >= 0.5) return '보통';
-    return '낮음';
+    if (value >= 0.8) return t('insight.confidence.high');
+    if (value >= 0.5) return t('insight.confidence.medium');
+    return t('insight.confidence.low');
   }
 
   let severityClass = $derived(
@@ -130,7 +140,7 @@
 </script>
 
 {#if insight}
-  <div class="insight-card {severityClass}" role="region" aria-label="AI 서버 상태 분석">
+  <div class="insight-card {severityClass}" role="region" aria-label={t('insight.ariaLabel')}>
     <div class="insight-header">
       <div class="insight-title-row">
         <div class="sparkle-icon" class:streaming>
@@ -138,7 +148,7 @@
         </div>
         <span class="insight-label">AI Insight</span>
         <span class="insight-badge {severityClass}">{badgeLabel}</span>
-        <span class="insight-confidence">신뢰도 {confidenceLabel(insight.confidence)}</span>
+        <span class="insight-confidence">{t('insight.trustLabel')} {confidenceLabel(insight.confidence)}</span>
       </div>
       <div class="insight-meta-inline">
         <span>{timeAgo(insight.created_at)}</span>
@@ -163,8 +173,8 @@
 
     {#if showFooter}
       <div class="insight-footer">
-        <span>다음 분석: {timeUntil(insight.expires_at)}</span>
-        <span class="insight-basis">24시간 기준</span>
+        <span>{t('insight.nextAnalysis')}: {timeUntil(insight.expires_at)}</span>
+        <span class="insight-basis">{t('insight.basis')}</span>
       </div>
     {/if}
   </div>

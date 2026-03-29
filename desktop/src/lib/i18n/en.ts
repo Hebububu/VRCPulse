@@ -67,6 +67,32 @@ export default {
   'settings.notifications': 'Incident notifications',
   'settings.notificationsDesc': 'Show native notification when new incidents are detected',
 
+  // Maintenance
+  'maintenance.upcoming': 'Upcoming Maintenance',
+  'maintenance.inProgress': 'Maintenance In Progress',
+  'maintenance.completed': 'Completed',
+  'maintenance.scheduled': 'Scheduled',
+  'maintenance.scheduledFor': 'Scheduled for',
+  'maintenance.scheduledUntil': 'Until',
+  'maintenance.viewAll': 'View All',
+  'maintenance.history': 'Maintenance History',
+  'maintenance.changeHistory': 'Change History',
+  'maintenance.viewSource': 'View on status.vrchat.com',
+  'maintenance.bannerText': 'Maintenance in progress',
+  'maintenance.bannerLink': 'View details',
+  'maintenance.noRecords': 'No scheduled maintenance',
+  'maintenance.recent': 'Maintenance',
+  'maintenance.notFound': 'Maintenance not found',
+
+  // AI Insight
+  'insight.confidence.high': 'High',
+  'insight.confidence.medium': 'Medium',
+  'insight.confidence.low': 'Low',
+  'insight.trustLabel': 'Confidence',
+  'insight.nextAnalysis': 'Next analysis',
+  'insight.basis': '24-hour basis',
+  'insight.ariaLabel': 'AI Server Status Analysis',
+
   // Error
   'error.retry': 'Retry',
   'error.connectionLost': 'Connection lost',

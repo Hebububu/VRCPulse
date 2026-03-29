@@ -1,13 +1,15 @@
 <script lang="ts">
   import Chart from './Chart.svelte';
   import InsightCard from './InsightCard.svelte';
+  import MaintenanceBanner from './MaintenanceBanner.svelte';
+  import MaintenanceFeed from './MaintenanceFeed.svelte';
   import TimeRangeSelector from './TimeRangeSelector.svelte';
   import IncidentFeed from './IncidentFeed.svelte';
   import PromoBanner from './PromoBanner.svelte';
   import { onMount } from 'svelte';
-  import { getDashboard, getIncidents, getInsight } from '../api';
+  import { getDashboard, getIncidents, getMaintenances, getInsight } from '../api';
   import { t } from '../i18n';
-  import type { AiInsightResponse, DashboardResponse, Incident } from '../types';
+  import type { InsightBundle, DashboardResponse, Incident, Maintenance } from '../types';
 
   interface Props {
     onStatusUpdate: (status: DashboardResponse['status']) => void;
@@ -23,7 +25,8 @@
   let dashboard: DashboardResponse | null = $state(null);
   let incidents: Incident[] = $state([]);
   let previousIncidentIds: Set<string> = new Set();
-  let insight: AiInsightResponse | null = $state(null);
+  let insightBundle: InsightBundle | null = $state(null);
+  let maintenances: Maintenance[] = $state([]);
   let loading = $state(true);
   let error = $state('');
 
@@ -59,15 +62,17 @@
 
   async function fetchData() {
     try {
-      const [dashData, incData, insightData] = await Promise.all([
+      const [dashData, incData, maintData, insightData] = await Promise.all([
         getDashboard(range),
         getIncidents('all'),
+        getMaintenances('all').catch(() => ({ maintenances: [] })),
         isTauri ? Promise.resolve({ insight: null }) : getInsight().catch(() => ({ insight: null })),
       ]);
       dashboard = dashData;
       checkNewIncidents(incData.incidents);
       incidents = incData.incidents;
-      insight = insightData.insight;
+      maintenances = maintData.maintenances;
+      insightBundle = insightData.insight;
       onStatusUpdate(dashData.status);
       onDataReceived();
       loading = false;
@@ -96,6 +101,8 @@
 </script>
 
 <div class="dashboard">
+  <MaintenanceBanner {maintenances} />
+
   <div class="toolbar">
     <TimeRangeSelector value={range} onChange={handleRangeChange} />
   </div>
@@ -108,7 +115,7 @@
   {/if}
 
   {#if !isTauri}
-    <InsightCard {insight} />
+    <InsightCard bundle={insightBundle} />
   {/if}
 
   <div class="main-area">
@@ -176,6 +183,7 @@
     <div class="sidebar">
       <PromoBanner />
       <IncidentFeed {incidents} />
+      <MaintenanceFeed {maintenances} />
     </div>
   </div>
 </div>

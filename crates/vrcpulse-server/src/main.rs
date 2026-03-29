@@ -124,6 +124,11 @@ async fn main() {
             get(get_incident_history),
         )
         .route("/maintenances", get(get_maintenances))
+        .route("/maintenances/{id}", get(get_maintenance_by_id))
+        .route(
+            "/maintenances/history/{maintenance_id}",
+            get(get_maintenance_history),
+        )
         .route("/insights/latest", get(get_insights_latest));
 
     let app = Router::new()
@@ -201,9 +206,30 @@ async fn get_incident_history(
     }
 }
 
+async fn get_maintenance_by_id(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.service.get_maintenance_by_id(&id).await {
+        Ok(Some(m)) => Json(m).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "Maintenance not found").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_maintenance_history(
+    State(state): State<Arc<AppState>>,
+    Path(maintenance_id): Path<String>,
+) -> impl IntoResponse {
+    match state.service.get_maintenance_history(&maintenance_id).await {
+        Ok(data) => Json(data).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 async fn get_insights_latest(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match state.service.get_latest_insight().await {
-        Ok(Some(insight)) => Json(serde_json::json!({ "insight": insight })).into_response(),
+        Ok(Some(bundle)) => Json(serde_json::json!({ "insight": bundle })).into_response(),
         Ok(None) => Json(serde_json::json!({ "insight": null })).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }

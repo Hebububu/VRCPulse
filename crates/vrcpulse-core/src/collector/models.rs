@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // VRChat Status API (Atlassian Statuspage) Response Types
@@ -72,7 +72,7 @@ pub struct MaintenancesResponse {
     pub scheduled_maintenances: Vec<Maintenance>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Maintenance {
     pub id: String,
     pub name: String,

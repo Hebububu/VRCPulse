@@ -68,8 +68,22 @@ export interface AiInsightResponse {
   expires_at: string;
 }
 
+export interface InsightBundle {
+  en: AiInsightResponse | null;
+  ko: AiInsightResponse | null;
+}
+
 export interface InsightApiResponse {
-  insight: AiInsightResponse | null;
+  insight: InsightBundle | null;
+}
+
+export interface MaintenanceSnapshotResponse {
+  maintenance_id: string;
+  title: string;
+  status: string;
+  scheduled_for: string;
+  scheduled_until: string;
+  fetched_at: string;
 }
 
 export interface IncidentSnapshotResponse {

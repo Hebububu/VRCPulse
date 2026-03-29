@@ -5,7 +5,8 @@ use std::time::Duration;
 
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use tokio::sync::mpsc;
 use tokio::time::interval;
@@ -77,6 +78,7 @@ pub async fn run_analysis_task(
 
     // Initial analysis: retry every 30s until data is available, then switch to hourly
     let mut initial = true;
+    let mut trigger_buf: Option<InsightTrigger> = None;
 
     loop {
         if initial {
@@ -84,15 +86,18 @@ pub async fn run_analysis_task(
             tokio::time::sleep(Duration::from_secs(10)).await;
         } else {
             tokio::select! {
-                _ = ticker.tick() => {},
-                Some(_event) = event_rx.recv() => {
+                _ = ticker.tick() => {
+                    trigger_buf = Some(InsightTrigger::Scheduled);
+                },
+                Some(event) = event_rx.recv() => {
+                    trigger_buf = Some(event);
                     // Drain queued events to coalesce rapid-fire triggers
                     while event_rx.try_recv().is_ok() {}
                 },
             };
         }
 
-        let trigger = InsightTrigger::Scheduled;
+        let trigger = trigger_buf.take().unwrap_or(InsightTrigger::Scheduled);
 
         match run_single_analysis(&db, &client, &trigger).await {
             Ok(true) => {
@@ -145,25 +150,93 @@ async fn run_single_analysis(
         }
     };
 
-    // Step 2: Check dedup for scheduled triggers
+    // Step 2: Check dedup for scheduled triggers (English hash only)
     let source_hash = compute_source_hash(trigger.trigger_type(), trigger.trigger_id(), &snapshot);
 
     if matches!(trigger, InsightTrigger::Scheduled) {
         if let Ok(true) = hash_exists(db, &source_hash).await {
-            debug!("Skipping analysis: source_hash unchanged");
-            return Ok(false);
+            // Check if the latest cycle has both languages before skipping
+            if let Ok(true) = latest_cycle_complete(db).await {
+                debug!("Skipping analysis: source_hash unchanged and both languages present");
+                return Ok(false);
+            }
+            debug!("Source hash unchanged but translation missing, regenerating");
         }
     }
 
-    // Step 3: Call Gemini
-    let response = client.generate_insight(&snapshot).await?;
+    // Step 3: Generate cycle_id
+    let cycle_id = generate_cycle_id();
 
-    // Step 4: Store insight
-    store_insight(db, trigger, &snapshot, &response, &source_hash)
-        .await
-        .map_err(|e| InsightError::ParseFailed(format!("DB write error: {e}")))?;
+    // Step 4: Call Gemini for English analysis
+    let en_response = client.generate_insight(&snapshot).await?;
+
+    // Step 5: Store English insight
+    store_insight(
+        db,
+        trigger,
+        &snapshot,
+        &en_response,
+        &source_hash,
+        "en",
+        &cycle_id,
+    )
+    .await
+    .map_err(|e| InsightError::ParseFailed(format!("DB write error: {e}")))?;
+
+    // Step 6: Translate to Korean (partial failure is OK)
+    match client.translate_insight(&en_response).await {
+        Ok(ko_response) => {
+            let ko_hash = format!("{source_hash}:ko");
+            if let Err(e) = store_insight(
+                db,
+                trigger,
+                &snapshot,
+                &ko_response,
+                &ko_hash,
+                "ko",
+                &cycle_id,
+            )
+            .await
+            {
+                warn!(error = %e, "Failed to store Korean translation");
+            }
+        }
+        Err(e) => {
+            warn!(error = %e, "Korean translation failed, English-only insight stored");
+        }
+    }
 
     Ok(true)
+}
+
+fn generate_cycle_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let rand: u32 = (ts as u32).wrapping_mul(2654435761); // simple hash for uniqueness
+    format!("{ts:x}-{rand:08x}")
+}
+
+/// Check if the latest cycle has both en and ko translations.
+async fn latest_cycle_complete(db: &DatabaseConnection) -> Result<bool, sea_orm::DbErr> {
+    let latest = ai_insights::Entity::find()
+        .order_by_desc(ai_insights::Column::CreatedAt)
+        .one(db)
+        .await?;
+
+    let latest = match latest {
+        Some(l) if !l.cycle_id.is_empty() => l,
+        _ => return Ok(false), // No cycle or legacy row
+    };
+
+    let count = ai_insights::Entity::find()
+        .filter(ai_insights::Column::CycleId.eq(&latest.cycle_id))
+        .count(db)
+        .await?;
+
+    Ok(count >= 2)
 }
 
 async fn hash_exists(db: &DatabaseConnection, hash: &str) -> Result<bool, sea_orm::DbErr> {
@@ -180,6 +253,8 @@ async fn store_insight(
     snapshot: &FeatureSnapshot,
     response: &InsightResponse,
     source_hash: &str,
+    language: &str,
+    cycle_id: &str,
 ) -> Result<(), sea_orm::DbErr> {
     let now = Utc::now();
     let window_end = now;
@@ -201,6 +276,8 @@ async fn store_insight(
         signals_json: Set(signals_json),
         model_id: Set(MODEL_ID.to_string()),
         source_hash: Set(source_hash.to_string()),
+        language: Set(language.to_string()),
+        cycle_id: Set(cycle_id.to_string()),
         created_at: Set(now),
         expires_at: Set(expires_at),
         ..Default::default()
@@ -209,6 +286,7 @@ async fn store_insight(
     model.insert(db).await?;
     info!(
         scope = trigger.scope(),
+        language = language,
         headline = %response.headline,
         confidence = response.confidence,
         severity = %response.severity,
@@ -233,4 +311,49 @@ async fn extend_latest_expiry(db: &DatabaseConnection) -> Result<(), sea_orm::Db
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_cycle_id_not_empty() {
+        let id = generate_cycle_id();
+        assert!(!id.is_empty());
+        assert!(id.contains('-'));
+    }
+
+    #[test]
+    fn test_generate_cycle_id_format() {
+        let id = generate_cycle_id();
+        let parts: Vec<&str> = id.split('-').collect();
+        assert_eq!(parts.len(), 2);
+        // Both parts should be valid hex
+        assert!(u128::from_str_radix(parts[0], 16).is_ok());
+        assert!(u32::from_str_radix(parts[1], 16).is_ok());
+    }
+
+    #[test]
+    fn test_insight_trigger_types() {
+        let scheduled = InsightTrigger::Scheduled;
+        assert_eq!(scheduled.trigger_type(), "scheduled");
+        assert_eq!(scheduled.scope(), "hourly");
+        assert!(scheduled.trigger_id().is_none());
+
+        let incident = InsightTrigger::IncidentDetected {
+            incident_id: "inc-123".to_string(),
+            title: "API Down".to_string(),
+        };
+        assert_eq!(incident.trigger_type(), "incident_detected");
+        assert_eq!(incident.scope(), "incident");
+        assert_eq!(incident.trigger_id(), Some("inc-123"));
+
+        let maintenance = InsightTrigger::MaintenanceDetected {
+            maintenance_id: "mnt-456".to_string(),
+        };
+        assert_eq!(maintenance.trigger_type(), "maintenance_detected");
+        assert_eq!(maintenance.scope(), "maintenance");
+        assert_eq!(maintenance.trigger_id(), Some("mnt-456"));
+    }
 }

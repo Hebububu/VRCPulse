@@ -34,6 +34,15 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - `/unfreeze` - Unfreeze
 - `/gstack-upgrade` - Upgrade gstack
 
+## Release Process
+All commits to `main` use the message format `release: X.Y.Z`.
+Deployment is triggered by pushing a `v*` tag:
+1. `git commit -m "release: X.Y.Z"`
+2. `git push origin main`
+3. `git tag vX.Y.Z && git push origin vX.Y.Z`
+
+The tag push triggers `.github/workflows/release.yml` which builds Tauri desktop apps for macOS/Linux/Windows and creates a GitHub Release with artifacts.
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.

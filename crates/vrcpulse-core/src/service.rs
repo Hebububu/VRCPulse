@@ -3,7 +3,8 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOr
 use serde::Serialize;
 
 use crate::entity::{
-    ai_insights, incident_snapshots, incident_updates, incidents, maintenances, status_logs,
+    ai_insights, incident_snapshots, incident_updates, incidents, maintenance_snapshots,
+    maintenances, status_logs,
 };
 use crate::insight::gemini_client::InsightResponse;
 use crate::query::{self, MetricData};
@@ -71,6 +72,16 @@ pub struct MaintenancesListResponse {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct MaintenanceSnapshotResponse {
+    pub maintenance_id: String,
+    pub title: String,
+    pub status: String,
+    pub scheduled_for: String,
+    pub scheduled_until: String,
+    pub fetched_at: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct IncidentSnapshotResponse {
     pub incident_id: String,
     pub title: String,
@@ -91,6 +102,12 @@ pub struct AiInsightResponse {
     pub model_id: String,
     pub created_at: String,
     pub expires_at: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct InsightBundle {
+    pub en: Option<AiInsightResponse>,
+    pub ko: Option<AiInsightResponse>,
 }
 
 fn hours_from_range(range: &str) -> i64 {
@@ -270,6 +287,46 @@ impl VrcPulseService {
         })
     }
 
+    /// Get a single maintenance by ID.
+    pub async fn get_maintenance_by_id(
+        &self,
+        id: &str,
+    ) -> Result<Option<MaintenanceResponse>, sea_orm::DbErr> {
+        let m = maintenances::Entity::find_by_id(id).one(&self.db).await?;
+
+        Ok(m.map(|m| MaintenanceResponse {
+            id: m.id,
+            name: m.title,
+            status: m.status,
+            scheduled_for: m.scheduled_for.to_rfc3339(),
+            scheduled_until: m.scheduled_until.to_rfc3339(),
+        }))
+    }
+
+    /// Get snapshot history for a specific maintenance.
+    pub async fn get_maintenance_history(
+        &self,
+        maintenance_id: &str,
+    ) -> Result<Vec<MaintenanceSnapshotResponse>, sea_orm::DbErr> {
+        let snapshots = maintenance_snapshots::Entity::find()
+            .filter(maintenance_snapshots::Column::MaintenanceId.eq(maintenance_id))
+            .order_by_asc(maintenance_snapshots::Column::FetchedAt)
+            .all(&self.db)
+            .await?;
+
+        Ok(snapshots
+            .into_iter()
+            .map(|s| MaintenanceSnapshotResponse {
+                maintenance_id: s.maintenance_id,
+                title: s.title,
+                status: s.status,
+                scheduled_for: s.scheduled_for.to_rfc3339(),
+                scheduled_until: s.scheduled_until.to_rfc3339(),
+                fetched_at: s.fetched_at.to_rfc3339(),
+            })
+            .collect())
+    }
+
     /// Get all incidents from snapshots (latest snapshot per incident)
     pub async fn get_incidents_from_snapshots(
         &self,
@@ -337,38 +394,75 @@ impl VrcPulseService {
     }
 
     /// Get the latest AI insight, if any.
-    pub async fn get_latest_insight(&self) -> Result<Option<AiInsightResponse>, sea_orm::DbErr> {
+    pub async fn get_latest_insight(&self) -> Result<Option<InsightBundle>, sea_orm::DbErr> {
+        // Find the most recent non-expired insight to get its cycle_id
+        let now = Utc::now();
         let latest = ai_insights::Entity::find()
+            .filter(ai_insights::Column::ExpiresAt.gte(now))
             .order_by_desc(ai_insights::Column::CreatedAt)
             .one(&self.db)
             .await?;
 
-        match latest {
-            Some(insight) => {
-                let summary: InsightResponse = serde_json::from_str(&insight.summary_json)
-                    .unwrap_or(InsightResponse {
-                        headline: insight.headline.clone(),
-                        bullets: vec![],
-                        affected_surfaces: vec![],
-                        reasoning_basis: vec![],
-                        confidence: insight.confidence,
-                        severity: "stable".to_string(),
-                    });
+        let latest = match latest {
+            Some(l) => l,
+            None => return Ok(None),
+        };
 
-                Ok(Some(AiInsightResponse {
-                    id: insight.id,
-                    scope: insight.scope,
-                    trigger_type: insight.trigger_type,
-                    headline: insight.headline,
-                    summary,
-                    confidence: insight.confidence,
-                    model_id: insight.model_id,
-                    created_at: insight.created_at.to_rfc3339(),
-                    expires_at: insight.expires_at.to_rfc3339(),
-                }))
+        // If cycle_id is empty (legacy row), return it as-is based on language
+        let insights = if latest.cycle_id.is_empty() {
+            vec![latest]
+        } else {
+            // Fetch all insights in the same cycle
+            ai_insights::Entity::find()
+                .filter(ai_insights::Column::CycleId.eq(&latest.cycle_id))
+                .all(&self.db)
+                .await?
+        };
+
+        let mut bundle = InsightBundle { en: None, ko: None };
+
+        for insight in insights {
+            let response = Self::insight_to_response(insight);
+            match response.1.as_str() {
+                "en" => bundle.en = Some(response.0),
+                "ko" => bundle.ko = Some(response.0),
+                _ => {}
             }
-            None => Ok(None),
         }
+
+        // Legacy fallback: if no language was set, treat as Korean
+        if bundle.en.is_none() && bundle.ko.is_none() {
+            return Ok(None);
+        }
+
+        Ok(Some(bundle))
+    }
+
+    fn insight_to_response(insight: ai_insights::Model) -> (AiInsightResponse, String) {
+        let language = insight.language.clone();
+        let summary: InsightResponse =
+            serde_json::from_str(&insight.summary_json).unwrap_or(InsightResponse {
+                headline: insight.headline.clone(),
+                bullets: vec![],
+                affected_surfaces: vec![],
+                reasoning_basis: vec![],
+                confidence: insight.confidence,
+                severity: "stable".to_string(),
+            });
+
+        let response = AiInsightResponse {
+            id: insight.id,
+            scope: insight.scope,
+            trigger_type: insight.trigger_type,
+            headline: insight.headline,
+            summary,
+            confidence: insight.confidence,
+            model_id: insight.model_id,
+            created_at: insight.created_at.to_rfc3339(),
+            expires_at: insight.expires_at.to_rfc3339(),
+        };
+
+        (response, language)
     }
 
     /// Get snapshot history for a specific incident
@@ -475,5 +569,231 @@ mod tests {
         assert_eq!(resolve_db_metric("meta_auth"), "extauth_oculus");
         assert_eq!(resolve_db_metric("api_latency"), "api_latency");
         assert_eq!(resolve_db_metric("unknown"), "unknown");
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_insight_empty_db() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let result = service.get_latest_insight().await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_insight_legacy_row() {
+        let db = setup_test_db().await;
+        // Legacy row: language='ko', cycle_id=''
+        db.execute_unprepared(
+            "INSERT INTO ai_insights (scope, trigger_type, window_start, window_end, headline, \
+             summary_json, confidence, signals_json, model_id, source_hash, language, cycle_id, \
+             created_at, expires_at) VALUES \
+             ('hourly', 'scheduled', datetime('now'), datetime('now'), 'VRChat 서버 안정', \
+             '{\"headline\":\"VRChat 서버 안정\",\"bullets\":[\"정상\"],\"confidence\":0.9,\"severity\":\"stable\"}', \
+             0.9, '{}', 'gemini-2.5-flash', 'hash1', 'ko', '', datetime('now'), datetime('now', '+24 hours'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let result = service.get_latest_insight().await.unwrap();
+        assert!(result.is_some());
+        let bundle = result.unwrap();
+        assert!(bundle.en.is_none());
+        assert!(bundle.ko.is_some());
+        assert_eq!(bundle.ko.unwrap().headline, "VRChat 서버 안정");
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_insight_dual_language() {
+        let db = setup_test_db().await;
+        // English insight
+        db.execute_unprepared(
+            "INSERT INTO ai_insights (scope, trigger_type, window_start, window_end, headline, \
+             summary_json, confidence, signals_json, model_id, source_hash, language, cycle_id, \
+             created_at, expires_at) VALUES \
+             ('hourly', 'scheduled', datetime('now'), datetime('now'), 'VRChat servers stable', \
+             '{\"headline\":\"VRChat servers stable\",\"bullets\":[\"Normal\"],\"confidence\":0.9,\"severity\":\"stable\"}', \
+             0.9, '{}', 'gemini-2.5-flash', 'hash-en', 'en', 'cycle-001', datetime('now'), datetime('now', '+24 hours'))",
+        )
+        .await
+        .unwrap();
+        // Korean insight
+        db.execute_unprepared(
+            "INSERT INTO ai_insights (scope, trigger_type, window_start, window_end, headline, \
+             summary_json, confidence, signals_json, model_id, source_hash, language, cycle_id, \
+             created_at, expires_at) VALUES \
+             ('hourly', 'scheduled', datetime('now'), datetime('now'), 'VRChat 서버 안정', \
+             '{\"headline\":\"VRChat 서버 안정\",\"bullets\":[\"정상\"],\"confidence\":0.9,\"severity\":\"stable\"}', \
+             0.9, '{}', 'gemini-2.5-flash', 'hash-ko', 'ko', 'cycle-001', datetime('now'), datetime('now', '+24 hours'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let result = service.get_latest_insight().await.unwrap();
+        assert!(result.is_some());
+        let bundle = result.unwrap();
+        assert!(bundle.en.is_some());
+        assert!(bundle.ko.is_some());
+        assert_eq!(bundle.en.unwrap().headline, "VRChat servers stable");
+        assert_eq!(bundle.ko.unwrap().headline, "VRChat 서버 안정");
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_insight_partial_cycle() {
+        let db = setup_test_db().await;
+        // Only English (Korean translation failed)
+        db.execute_unprepared(
+            "INSERT INTO ai_insights (scope, trigger_type, window_start, window_end, headline, \
+             summary_json, confidence, signals_json, model_id, source_hash, language, cycle_id, \
+             created_at, expires_at) VALUES \
+             ('hourly', 'scheduled', datetime('now'), datetime('now'), 'VRChat servers stable', \
+             '{\"headline\":\"VRChat servers stable\",\"bullets\":[\"Normal\"],\"confidence\":0.9,\"severity\":\"stable\"}', \
+             0.9, '{}', 'gemini-2.5-flash', 'hash-en', 'en', 'cycle-partial', datetime('now'), datetime('now', '+24 hours'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let result = service.get_latest_insight().await.unwrap();
+        assert!(result.is_some());
+        let bundle = result.unwrap();
+        assert!(bundle.en.is_some());
+        assert!(bundle.ko.is_none());
+    }
+
+    #[test]
+    fn test_insight_to_response() {
+        use chrono::Utc;
+        let now = Utc::now();
+        let model = ai_insights::Model {
+            id: 42,
+            scope: "hourly".to_string(),
+            trigger_type: "scheduled".to_string(),
+            trigger_id: None,
+            window_start: now,
+            window_end: now,
+            headline: "Test headline".to_string(),
+            summary_json: r#"{"headline":"Test headline","bullets":["point1"],"confidence":0.85,"severity":"stable"}"#.to_string(),
+            confidence: 0.85,
+            signals_json: "{}".to_string(),
+            model_id: "gemini-2.5-flash".to_string(),
+            source_hash: "abc123".to_string(),
+            language: "en".to_string(),
+            cycle_id: "cycle-test".to_string(),
+            created_at: now,
+            expires_at: now,
+        };
+
+        let (response, language) = VrcPulseService::insight_to_response(model);
+        assert_eq!(response.id, 42);
+        assert_eq!(response.headline, "Test headline");
+        assert_eq!(response.summary.bullets, vec!["point1"]);
+        assert!((response.confidence - 0.85).abs() < f64::EPSILON);
+        assert_eq!(language, "en");
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_insight_expired_returns_none() {
+        let db = setup_test_db().await;
+        // Expired insight (1 hour ago)
+        db.execute_unprepared(
+            "INSERT INTO ai_insights (scope, trigger_type, window_start, window_end, headline, \
+             summary_json, confidence, signals_json, model_id, source_hash, language, cycle_id, \
+             created_at, expires_at) VALUES \
+             ('hourly', 'scheduled', datetime('now', '-2 hours'), datetime('now', '-1 hour'), 'Expired', \
+             '{\"headline\":\"Expired\",\"bullets\":[],\"confidence\":0.5,\"severity\":\"stable\"}', \
+             0.5, '{}', 'gemini-2.5-flash', 'hash-expired', 'en', 'cycle-expired', \
+             datetime('now', '-1 hour'), datetime('now', '-1 minute'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let result = service.get_latest_insight().await.unwrap();
+        assert!(result.is_none(), "Expired insights should not be returned");
+    }
+
+    #[tokio::test]
+    async fn test_get_maintenance_by_id_found() {
+        let db = setup_test_db().await;
+        db.execute_unprepared(
+            "INSERT INTO maintenances (id, title, status, scheduled_for, scheduled_until, created_at, updated_at) \
+             VALUES ('mnt-1', 'Server Migration', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+3 hours'), datetime('now'), datetime('now'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let result = service.get_maintenance_by_id("mnt-1").await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "Server Migration");
+    }
+
+    #[tokio::test]
+    async fn test_get_maintenance_by_id_not_found() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let result = service.get_maintenance_by_id("nonexistent").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_maintenance_history_with_snapshots() {
+        let db = setup_test_db().await;
+        // Insert snapshots
+        db.execute_unprepared(
+            "INSERT INTO maintenance_snapshots (maintenance_id, title, status, scheduled_for, scheduled_until, raw_json, fetched_at) \
+             VALUES ('mnt-1', 'Migration', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+3 hours'), '{}', datetime('now', '-30 minutes'))",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared(
+            "INSERT INTO maintenance_snapshots (maintenance_id, title, status, scheduled_for, scheduled_until, raw_json, fetched_at) \
+             VALUES ('mnt-1', 'Migration', 'in_progress', datetime('now', '+1 hour'), datetime('now', '+3 hours'), '{}', datetime('now'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+        let history = service.get_maintenance_history("mnt-1").await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].status, "scheduled");
+        assert_eq!(history[1].status, "in_progress");
+    }
+
+    #[tokio::test]
+    async fn test_get_maintenance_history_empty() {
+        let db = setup_test_db().await;
+        let service = VrcPulseService::new(db);
+        let history = service
+            .get_maintenance_history("nonexistent")
+            .await
+            .unwrap();
+        assert!(history.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_maintenances_filters() {
+        let db = setup_test_db().await;
+        db.execute_unprepared(
+            "INSERT INTO maintenances (id, title, status, scheduled_for, scheduled_until, created_at, updated_at) VALUES \
+             ('m1', 'Scheduled One', 'scheduled', datetime('now', '+1 hour'), datetime('now', '+2 hours'), datetime('now'), datetime('now')), \
+             ('m2', 'In Progress', 'in_progress', datetime('now'), datetime('now', '+1 hour'), datetime('now'), datetime('now')), \
+             ('m3', 'Done', 'completed', datetime('now', '-2 hours'), datetime('now', '-1 hour'), datetime('now'), datetime('now'))",
+        )
+        .await
+        .unwrap();
+
+        let service = VrcPulseService::new(db);
+
+        // in_progress filter
+        let result = service.get_maintenances("in_progress").await.unwrap();
+        assert_eq!(result.maintenances.len(), 1);
+        assert_eq!(result.maintenances[0].name, "In Progress");
+
+        // all filter
+        let result = service.get_maintenances("all").await.unwrap();
+        assert_eq!(result.maintenances.len(), 3);
     }
 }

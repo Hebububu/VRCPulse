@@ -20,6 +20,8 @@ pub struct Model {
     pub signals_json: String,
     pub model_id: String,
     pub source_hash: String,
+    pub language: String,
+    pub cycle_id: String,
     pub created_at: DateTimeUtc,
     pub expires_at: DateTimeUtc,
 }
