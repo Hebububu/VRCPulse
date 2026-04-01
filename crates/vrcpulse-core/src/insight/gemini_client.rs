@@ -90,21 +90,22 @@ impl GeminiClient {
     pub async fn translate_insight(
         &self,
         english_insight: &InsightResponse,
+        target_locale: &str,
     ) -> Result<InsightResponse, InsightError> {
-        let request_body = build_translation_request_body(english_insight)?;
+        let request_body = build_translation_request_body(english_insight, target_locale)?;
 
-        debug!(model = %self.model, "Sending translation request to Gemini API");
+        debug!(model = %self.model, locale = target_locale, "Sending translation request to Gemini API");
 
-        let mut korean = self
+        let mut translated = self
             .call_gemini(&request_body, TRANSLATION_TIMEOUT_SECS)
             .await?;
 
         // Copy non-translatable fields from English source
-        korean.affected_surfaces = english_insight.affected_surfaces.clone();
-        korean.confidence = english_insight.confidence;
-        korean.severity = english_insight.severity.clone();
+        translated.affected_surfaces = english_insight.affected_surfaces.clone();
+        translated.confidence = english_insight.confidence;
+        translated.severity = english_insight.severity.clone();
 
-        Ok(korean)
+        Ok(translated)
     }
 
     /// Translate incident/maintenance content to the target locale.
@@ -254,7 +255,29 @@ fn build_analysis_request_body(features_json: &str) -> serde_json::Value {
 
 fn build_translation_request_body(
     english_insight: &InsightResponse,
+    target_locale: &str,
 ) -> Result<serde_json::Value, InsightError> {
+    let (locale_name, desc_headline, desc_bullets, desc_reasoning) = match target_locale {
+        "ko" => (
+            "Korean",
+            "한줄 요약 (한국어)",
+            "분석 포인트 3-4개 (한국어)",
+            "분석 근거 (한국어)",
+        ),
+        "jp" => (
+            "Japanese",
+            "一行要約（日本語）",
+            "分析ポイント3-4個（日本語）",
+            "分析根拠（日本語）",
+        ),
+        _ => (
+            target_locale,
+            "One-line summary (translated)",
+            "3-4 analysis points (translated)",
+            "Reasoning basis (translated)",
+        ),
+    };
+
     let source_json = serde_json::json!({
         "headline": english_insight.headline,
         "bullets": english_insight.bullets,
@@ -267,7 +290,7 @@ fn build_translation_request_body(
         "contents": [{
             "parts": [{
                 "text": format!(
-                    "Translate the following VRChat server status analysis to Korean. \
+                    "Translate the following VRChat server status analysis to {locale_name}. \
                      Maintain technical terms (e.g. Steam, API, Oculus). \
                      Return only the translated fields in the same JSON structure.\n\n{source_text}"
                 )
@@ -280,17 +303,17 @@ fn build_translation_request_body(
                 "properties": {
                     "headline": {
                         "type": "string",
-                        "description": "한줄 요약 (한국어)"
+                        "description": desc_headline
                     },
                     "bullets": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "분석 포인트 3-4개 (한국어)"
+                        "description": desc_bullets
                     },
                     "reasoning_basis": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "분석 근거 (한국어)"
+                        "description": desc_reasoning
                     }
                 },
                 "required": ["headline", "bullets"]
@@ -307,7 +330,7 @@ fn build_content_translation_body(
 ) -> serde_json::Value {
     let locale_name = match target_locale {
         "ko" => "Korean",
-        "ja" => "Japanese",
+        "ja" | "jp" => "Japanese",
         _ => target_locale,
     };
 
@@ -407,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_translation_request_body() {
+    fn test_build_translation_request_body_korean() {
         let insight = InsightResponse {
             headline: "VRChat servers stable".to_string(),
             bullets: vec!["All systems normal".to_string()],
@@ -416,7 +439,7 @@ mod tests {
             confidence: 0.9,
             severity: "stable".to_string(),
         };
-        let body = build_translation_request_body(&insight).unwrap();
+        let body = build_translation_request_body(&insight, "ko").unwrap();
         assert_eq!(
             body["generationConfig"]["responseMimeType"],
             "application/json"
@@ -426,6 +449,26 @@ mod tests {
         assert!(text.contains("VRChat servers stable"));
         // Translation schema should not include severity/confidence
         assert!(body["generationConfig"]["responseSchema"]["properties"]["severity"].is_null());
+    }
+
+    #[test]
+    fn test_build_translation_request_body_japanese() {
+        let insight = InsightResponse {
+            headline: "VRChat servers stable".to_string(),
+            bullets: vec!["All systems normal".to_string()],
+            affected_surfaces: vec!["api".to_string()],
+            reasoning_basis: vec!["Low error rate".to_string()],
+            confidence: 0.9,
+            severity: "stable".to_string(),
+        };
+        let body = build_translation_request_body(&insight, "jp").unwrap();
+        let text = body["contents"][0]["parts"][0]["text"].as_str().unwrap();
+        assert!(text.contains("Japanese"));
+        let desc =
+            body["generationConfig"]["responseSchema"]["properties"]["headline"]["description"]
+                .as_str()
+                .unwrap();
+        assert!(desc.contains("日本語"));
     }
 
     #[test]
@@ -482,7 +525,7 @@ mod tests {
             confidence: 0.95,
             severity: "warning".to_string(),
         };
-        let body = build_translation_request_body(&insight).unwrap();
+        let body = build_translation_request_body(&insight, "ko").unwrap();
         let text = body["contents"][0]["parts"][0]["text"].as_str().unwrap();
         // Source text should contain translatable fields
         assert!(text.contains("VRChat servers stable"));

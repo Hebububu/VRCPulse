@@ -19,11 +19,11 @@
   let { onStatusUpdate, onDataReceived }: Props = $props();
 
   let isTauri = $state(false);
-  let windowClass: 'compact' | 'standard' | 'expanded' = $state('standard');
+  let windowClass = $state<'compact' | 'standard' | 'expanded'>('standard');
 
   function getWindowClass(w: number, h: number): 'compact' | 'standard' | 'expanded' {
     if (w >= 1600 && h >= 900) return 'expanded';
-    if (w >= 1200 && h >= 800) return 'standard';
+    if (w >= 900 && h >= 600) return 'standard';
     return 'compact';
   }
 
@@ -116,8 +116,8 @@
       loading = false;
       error = '';
 
-      // Auto-fetch translations for Korean locale
-      if (getLocale() === 'ko') {
+      // Auto-fetch translations for non-English locale
+      if (getLocale() !== 'en') {
         fetchTranslations(incData.incidents, maintData.maintenances);
       }
     } catch (e) {
@@ -145,7 +145,7 @@
     for (const inc of incs.slice(0, 5)) {
       if (newIncTranslations[inc.id]) continue;
       try {
-        const result = await getTranslation('incident', inc.id, 'ko');
+        const result = await getTranslation('incident', inc.id, getLocale());
         newIncTranslations[inc.id] = result;
         incidentTranslations = { ...newIncTranslations };
       } catch { break; }
@@ -154,7 +154,7 @@
     for (const m of maints.slice(0, 5)) {
       if (newMaintTranslations[m.id]) continue;
       try {
-        const result = await getTranslation('maintenance', m.id, 'ko');
+        const result = await getTranslation('maintenance', m.id, getLocale());
         newMaintTranslations[m.id] = result;
         maintenanceTranslations = { ...newMaintTranslations };
       } catch { break; }

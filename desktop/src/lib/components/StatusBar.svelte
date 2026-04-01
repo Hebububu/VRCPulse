@@ -50,7 +50,8 @@
     }
   });
 
-  const langLabel = getLocale() === 'en' ? 'KO' : 'EN';
+  const langLabels: Record<string, string> = { en: 'KO', ko: 'JP', jp: 'EN' };
+  const langLabel = langLabels[getLocale()] ?? 'EN';
 </script>
 
 <header class="status-bar">

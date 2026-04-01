@@ -1,10 +1,13 @@
 import { writable, get } from 'svelte/store';
 import en from './en';
 import ko from './ko';
+import jp from './jp';
 
 type TranslationKey = keyof typeof en;
 
-const translations: Record<string, Record<string, string>> = { en, ko };
+const translations: Record<string, Record<string, string>> = { en, ko, jp };
+
+const localeOrder = ['en', 'ko', 'jp'] as const;
 
 function detectLocale(): string {
   if (typeof window === 'undefined') return 'en';
@@ -36,5 +39,8 @@ export function setLocale(l: string) {
 }
 
 export function toggleLocale() {
-  setLocale(getLocale() === 'en' ? 'ko' : 'en');
+  const current = getLocale();
+  const idx = localeOrder.indexOf(current as typeof localeOrder[number]);
+  const next = localeOrder[(idx + 1) % localeOrder.length];
+  setLocale(next);
 }

@@ -13,7 +13,7 @@
   let { incidents, maxItems = 5, compact = false, translations = {} }: Props = $props();
 
   const recent = $derived(incidents.slice(0, maxItems));
-  const isKorean = getLocale() === 'ko';
+  const needsTranslation = getLocale() !== 'en';
 
   // Track which incidents user toggled to show original
   let showOriginal: Record<string, boolean> = $state({});
@@ -24,14 +24,14 @@
   }
 
   function getDisplayName(incident: Incident): string {
-    if (isKorean && translations[incident.id] && !showOriginal[incident.id]) {
+    if (needsTranslation && translations[incident.id] && !showOriginal[incident.id]) {
       return translations[incident.id].translated_name;
     }
     return incident.name;
   }
 
   function isTranslated(id: string): boolean {
-    return isKorean && !!translations[id] && !showOriginal[id];
+    return needsTranslation && !!translations[id] && !showOriginal[id];
   }
 
   function timeAgo(dateStr: string): string {
@@ -80,26 +80,32 @@
           <span class="impact-dot" style="background: {impactColor(incident.impact)}"></span>
           <span class="incident-name">{getDisplayName(incident)}</span>
           {#if isTranslated(incident.id)}
-            <button
+            <span
               class="translate-btn translated"
+              role="button"
+              tabindex="0"
               onclick={(e) => toggleOriginal(e, incident.id)}
+              onkeydown={(e) => e.key === 'Enter' && toggleOriginal(e, incident.id)}
               aria-label={t('translate.showOriginal')}
             >
               <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
                 <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
               </svg>
               <span class="translate-badge">{t('translate.aiTranslated')}</span>
-            </button>
-          {:else if isKorean && showOriginal[incident.id]}
-            <button
+            </span>
+          {:else if needsTranslation && showOriginal[incident.id]}
+            <span
               class="translate-btn"
+              role="button"
+              tabindex="0"
               onclick={(e) => toggleOriginal(e, incident.id)}
+              onkeydown={(e) => e.key === 'Enter' && toggleOriginal(e, incident.id)}
               aria-label={t('translate.button')}
             >
               <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
                 <path d="M208,144a15.78,15.78,0,0,1-10.42,14.94l-51.65,19.06L126.87,229.65a16,16,0,0,1-30.08-.57l-17.64-48.18L31,163.26a16,16,0,0,1,.57-30.08L79.68,115.1l19.06-51.65a15.78,15.78,0,0,1,29.86.36l18.64,48.42,48.42,18.64A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/>
               </svg>
-            </button>
+            </span>
           {/if}
         </div>
         <div class="incident-meta">
@@ -243,18 +249,10 @@
     color: var(--accent);
   }
 
-  .translate-btn.loading {
-    animation: sparkle-pulse 1s ease-in-out infinite;
-  }
-
   .translate-btn.translated {
     color: var(--accent);
     width: auto;
     gap: 4px;
-  }
-
-  .translate-btn.error {
-    color: var(--status-critical);
   }
 
   .translate-badge {
@@ -264,10 +262,6 @@
     background: rgba(96, 165, 250, 0.2);
     padding: 1px 6px;
     white-space: nowrap;
-  }
-
-  .incident-name.translated {
-    transition: opacity 200ms;
   }
 
   .translate-announce {

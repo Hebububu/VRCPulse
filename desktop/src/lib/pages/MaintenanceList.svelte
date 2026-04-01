@@ -8,7 +8,8 @@
   let loading = $state(true);
   let error = $state('');
   let filter = $state('all');
-  const isKorean = getLocale() === 'ko';
+  const currentLocale = getLocale();
+  const needsTranslation = currentLocale !== 'en';
   let translations: Record<string, TranslationResponse> = $state({});
 
   async function fetchData() {
@@ -17,7 +18,7 @@
       const data = await getMaintenances(filter === 'upcoming' ? 'upcoming' : filter);
       maintenances = data.maintenances;
       error = '';
-      if (isKorean) fetchTranslations(data.maintenances);
+      if (needsTranslation) fetchTranslations(data.maintenances);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     }
@@ -29,14 +30,14 @@
     for (const m of items.slice(0, 20)) {
       if (updated[m.id]) continue;
       try {
-        updated[m.id] = await getTranslation('maintenance', m.id, 'ko');
+        updated[m.id] = await getTranslation('maintenance', m.id, currentLocale);
         translations = { ...updated };
       } catch { break; }
     }
   }
 
   function getName(m: Maintenance): string {
-    if (isKorean && translations[m.id]) return translations[m.id].translated_name;
+    if (needsTranslation && translations[m.id]) return translations[m.id].translated_name;
     return m.name;
   }
 

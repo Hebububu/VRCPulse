@@ -56,6 +56,7 @@
         <div class="lang-select">
           <button class="lang-opt" class:active={language === 'en'} onclick={() => changeLang('en')}>English</button>
           <button class="lang-opt" class:active={language === 'ko'} onclick={() => changeLang('ko')}>한국어</button>
+          <button class="lang-opt" class:active={language === 'jp'} onclick={() => changeLang('jp')}>日本語</button>
         </div>
       </div>
     </div>

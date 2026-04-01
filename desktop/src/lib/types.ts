@@ -73,6 +73,7 @@ export interface AiInsightResponse {
 export interface InsightBundle {
   en: AiInsightResponse | null;
   ko: AiInsightResponse | null;
+  jp: AiInsightResponse | null;
 }
 
 export interface InsightApiResponse {

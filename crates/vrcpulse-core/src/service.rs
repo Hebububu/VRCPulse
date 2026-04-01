@@ -129,6 +129,7 @@ pub struct AiInsightResponse {
 pub struct InsightBundle {
     pub en: Option<AiInsightResponse>,
     pub ko: Option<AiInsightResponse>,
+    pub jp: Option<AiInsightResponse>,
 }
 
 fn hours_from_range(range: &str) -> i64 {
@@ -456,13 +457,18 @@ impl VrcPulseService {
                 .await?
         };
 
-        let mut bundle = InsightBundle { en: None, ko: None };
+        let mut bundle = InsightBundle {
+            en: None,
+            ko: None,
+            jp: None,
+        };
 
         for insight in insights {
             let response = Self::insight_to_response(insight);
             match response.1.as_str() {
                 "en" => bundle.en = Some(response.0),
                 "ko" => bundle.ko = Some(response.0),
+                "jp" => bundle.jp = Some(response.0),
                 _ => {}
             }
         }
@@ -704,7 +710,7 @@ impl VrcPulseService {
         Ok((m.title, m.description, Vec::new()))
     }
 
-    /// Pre-translate all incidents and maintenances to Korean.
+    /// Pre-translate all incidents and maintenances to all supported locales.
     /// Translates most recent items first, with delays between requests to avoid rate limiting.
     pub async fn pre_translate_all(&self) {
         use tokio::time::{Duration, sleep};
@@ -712,13 +718,14 @@ impl VrcPulseService {
 
         const DELAY_BETWEEN_REQUESTS: Duration = Duration::from_secs(8);
         const RATE_LIMIT_PAUSE: Duration = Duration::from_secs(120);
+        const LOCALES: &[&str] = &["ko", "jp"];
 
         if self.gemini_api_key.is_none() {
             warn!("Skipping pre-translation: no Gemini API key");
             return;
         }
 
-        info!("Starting pre-translation of incidents and maintenances to Korean");
+        info!("Starting pre-translation of incidents and maintenances");
 
         // Collect unique incident IDs (most recent first)
         let snapshots = incident_snapshots::Entity::find()
@@ -751,22 +758,24 @@ impl VrcPulseService {
         for i in 0..max_len {
             // Incident
             if let Some(id) = incident_ids.get(i) {
-                let result: Result<TranslationResponse, String> =
-                    self.translate_content("incident", id, "ko").await;
-                match result {
-                    Ok(r) if r.cached => {
-                        debug!(incident_id = %id, "Incident translation already cached");
-                    }
-                    Ok(r) => {
-                        info!(incident_id = %id, name = %r.translated_name, "Pre-translated incident");
-                        sleep(DELAY_BETWEEN_REQUESTS).await;
-                    }
-                    Err(e) => {
-                        let rate_limited = e.contains("Rate limited");
-                        warn!(incident_id = %id, "Failed to pre-translate incident: {e}");
-                        if rate_limited {
-                            info!("Rate limited, pausing pre-translation for 60s");
-                            sleep(RATE_LIMIT_PAUSE).await;
+                for locale in LOCALES {
+                    let result: Result<TranslationResponse, String> =
+                        self.translate_content("incident", id, locale).await;
+                    match result {
+                        Ok(r) if r.cached => {
+                            debug!(incident_id = %id, locale = locale, "Incident translation already cached");
+                        }
+                        Ok(r) => {
+                            info!(incident_id = %id, locale = locale, name = %r.translated_name, "Pre-translated incident");
+                            sleep(DELAY_BETWEEN_REQUESTS).await;
+                        }
+                        Err(e) => {
+                            let rate_limited = e.contains("Rate limited");
+                            warn!(incident_id = %id, locale = locale, "Failed to pre-translate incident: {e}");
+                            if rate_limited {
+                                info!("Rate limited, pausing pre-translation for 120s");
+                                sleep(RATE_LIMIT_PAUSE).await;
+                            }
                         }
                     }
                 }
@@ -774,22 +783,24 @@ impl VrcPulseService {
 
             // Maintenance
             if let Some(id) = maint_ids.get(i) {
-                let result: Result<TranslationResponse, String> =
-                    self.translate_content("maintenance", id, "ko").await;
-                match result {
-                    Ok(r) if r.cached => {
-                        debug!(maintenance_id = %id, "Maintenance translation already cached");
-                    }
-                    Ok(r) => {
-                        info!(maintenance_id = %id, name = %r.translated_name, "Pre-translated maintenance");
-                        sleep(DELAY_BETWEEN_REQUESTS).await;
-                    }
-                    Err(e) => {
-                        let rate_limited = e.contains("Rate limited");
-                        warn!(maintenance_id = %id, "Failed to pre-translate maintenance: {e}");
-                        if rate_limited {
-                            info!("Rate limited, pausing pre-translation for 60s");
-                            sleep(RATE_LIMIT_PAUSE).await;
+                for locale in LOCALES {
+                    let result: Result<TranslationResponse, String> =
+                        self.translate_content("maintenance", id, locale).await;
+                    match result {
+                        Ok(r) if r.cached => {
+                            debug!(maintenance_id = %id, locale = locale, "Maintenance translation already cached");
+                        }
+                        Ok(r) => {
+                            info!(maintenance_id = %id, locale = locale, name = %r.translated_name, "Pre-translated maintenance");
+                            sleep(DELAY_BETWEEN_REQUESTS).await;
+                        }
+                        Err(e) => {
+                            let rate_limited = e.contains("Rate limited");
+                            warn!(maintenance_id = %id, locale = locale, "Failed to pre-translate maintenance: {e}");
+                            if rate_limited {
+                                info!("Rate limited, pausing pre-translation for 120s");
+                                sleep(RATE_LIMIT_PAUSE).await;
+                            }
                         }
                     }
                 }

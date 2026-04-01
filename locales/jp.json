@@ -1,0 +1,286 @@
+{
+  "commands": {
+    "status": {
+      "name": "ステータス",
+      "description": "VRChatサーバーの状態を確認する"
+    },
+    "config": {
+      "name": "設定",
+      "description": "VRCPulseの設定を行う",
+      "setup": {
+        "name": "登録",
+        "description": "VRCPulseアラートの登録",
+        "option_channel": "アラートを受信するチャンネル"
+      },
+      "show": {
+        "name": "確認",
+        "description": "現在の設定を確認する"
+      },
+      "unregister": {
+        "name": "解除",
+        "description": "VRCPulseアラートを無効にする"
+      },
+      "language": {
+        "name": "言語",
+        "description": "アラートの言語を設定する",
+        "option_code": "言語コード"
+      }
+    },
+    "report": {
+      "name": "報告",
+      "description": "VRChatサーバーの問題を報告する",
+      "option_type": "発生している問題の種類",
+      "option_details": "問題の詳細説明（最大500文字）"
+    },
+    "hello": {
+      "name": "挨拶",
+      "description": "こんにちは！"
+    }
+  },
+
+  "embeds": {
+    "dashboard": {
+      "title": "VRChatステータスダッシュボード",
+      "system_status": "現在のシステム状態",
+      "online_users": "現在のオンラインユーザー",
+      "api_error_rate": "現在のAPIエラー率",
+      "steam_auth": "Steamログインサーバーの状態",
+      "meta_auth": "Metaログインサーバーの状態",
+      "footer_timeframe": "過去12時間",
+      "components": "コンポーネント",
+      "no_data": "データなし",
+      "group_api_website": "API / ウェブサイト",
+      "group_realtime_networking": "リアルタイムネットワーキング",
+      "error_title": "エラー",
+      "error_description": "ダッシュボードの生成に失敗しました。後でもう一度お試しください。"
+    },
+
+    "config": {
+      "show": {
+        "guild_active": {
+          "title": "VRCPulse設定",
+          "field_status": "ステータス",
+          "field_status_value": "有効",
+          "field_channel": "チャンネル",
+          "field_channel_not_set": "未設定",
+          "field_language": "言語",
+          "field_registered": "登録日",
+          "footer": "/設定 解除でアラートを無効にできます"
+        },
+        "guild_disabled": {
+          "title": "VRCPulse - 登録解除済み",
+          "description": "このサーバーは%{time}に登録解除されました。\n`/設定 登録 #チャンネル`を実行してアラートを再度有効にしてください。",
+          "field_previous_channel": "以前のチャンネル",
+          "field_originally_registered": "初回登録日"
+        },
+        "guild_intro": {
+          "title": "VRCPulseへようこそ！",
+          "description": "VRCPulseはVRChatサーバーの状態を監視し、問題が発生した際に自動的にお知らせします。",
+          "field_getting_started": "はじめに",
+          "field_getting_started_value": "1. `/設定 登録 #チャンネル`を実行してこのサーバーを登録してください\n2. `/ステータス`で現在のVRChatの状態を確認できます",
+          "field_commands": "コマンド",
+          "field_commands_value": "- `/設定 登録 <チャンネル>` - 登録とアラートチャンネルの設定\n- `/設定 確認` - 現在の設定を表示\n- `/設定 解除` - アラートを無効にする",
+          "footer": "このサーバーはまだ登録されていません。/設定 登録 #チャンネルを実行して開始してください！"
+        },
+        "user_active": {
+          "title": "VRCPulse設定",
+          "field_status": "ステータス",
+          "field_status_value": "有効",
+          "field_delivery": "配信方法",
+          "field_delivery_value": "ダイレクトメッセージ",
+          "field_language": "言語",
+          "field_registered": "登録日",
+          "footer": "/設定 解除でアラートを無効にできます"
+        },
+        "user_disabled": {
+          "title": "VRCPulse - 登録解除済み",
+          "description": "%{time}に登録を解除しました。\n`/設定 登録`を実行してDMアラートを再度有効にしてください。",
+          "field_originally_registered": "初回登録日"
+        },
+        "user_intro": {
+          "title": "VRCPulseへようこそ！",
+          "description": "VRCPulseはVRChatサーバーの状態を監視し、問題が発生した際にお知らせします。",
+          "field_getting_started": "はじめに",
+          "field_getting_started_value": "1. `/設定 登録`を実行してDMアラートを登録してください\n2. `/ステータス`で現在のVRChatの状態を確認できます",
+          "field_commands": "コマンド",
+          "field_commands_value": "- `/設定 登録` - DMアラートの登録\n- `/設定 確認` - 現在の設定を表示\n- `/設定 解除` - アラートを無効にする",
+          "footer": "まだ登録されていません。/設定 登録を実行して開始してください！"
+        }
+      },
+      "unregister": {
+        "confirm": {
+          "title": "登録解除の確認",
+          "description_guild": "本当に**%{name}**の登録を解除しますか？\n\nこのサーバーのすべてのVRCPulseアラートが停止されます。",
+          "description_user": "本当に登録を解除しますか？\n\nすべてのVRCPulse DMアラートが停止されます。",
+          "footer": "この確認は15分後に期限切れになります"
+        },
+        "success": {
+          "title": "登録解除完了",
+          "description": "VRCPulseアラートが無効になりました。\n\n`/設定 登録`でいつでも再登録できます。"
+        },
+        "cancelled": {
+          "title": "キャンセル",
+          "description": "登録解除がキャンセルされました。設定はそのまま維持されます。"
+        },
+        "error": {
+          "title": "エラー",
+          "description": "登録解除に失敗しました。もう一度お試しください。"
+        }
+      },
+      "language": {
+        "current": {
+          "title": "言語設定",
+          "description": "この%{context}の現在の言語: **%{language}**",
+          "field_available": "利用可能な言語",
+          "field_available_value": "- `en` - English（英語）\n- `ko` - 한국어（韓国語）\n- `jp` - 日本語\n- `auto` - 自動検出（Discord）",
+          "footer": "/設定 言語 <コード>で変更"
+        },
+        "updated": {
+          "title": "言語が変更されました",
+          "description": "言語が**%{language}**に設定されました。"
+        },
+        "names": {
+          "en": "English（英語）",
+          "ko": "한국어（韓国語）",
+          "jp": "日本語",
+          "auto": "自動検出（Discord）"
+        }
+      },
+      "setup": {
+        "error_channel_required": "アラートを受信するチャンネルを指定してください。\n使用方法: `/設定 登録 #チャンネル`",
+        "error_update_failed": "設定の更新に失敗しました。もう一度お試しください。",
+        "error_registration_failed": "登録に失敗しました。もう一度お試しください。",
+        "already_registered": {
+          "title": "登録済み",
+          "description_guild": "このサーバーはすでに%{channel}で登録されています。\n\n`/設定 確認`で設定を表示するか、`/設定 解除`で無効にしてください。",
+          "description_user": "すでにDMアラートに登録されています。\n\n`/設定 確認`で設定を表示するか、`/設定 解除`で無効にしてください。"
+        },
+        "channel_updated": {
+          "title": "チャンネル変更完了",
+          "description": "アラートチャンネルが%{channel}に変更されました。"
+        },
+        "success": {
+          "title": "登録完了！",
+          "description_guild": "VRCPulseアラートが%{channel}に送信されます。\n\n**コマンド**\n- `/設定 確認` - 設定を表示\n- `/設定 解除` - アラートを無効にする\n- `/ステータス` - VRChatの状態を確認",
+          "description_user": "VRCPulseアラートがDMに送信されます。\n\n**コマンド**\n- `/設定 確認` - 設定を表示\n- `/設定 解除` - アラートを無効にする\n- `/ステータス` - VRChatの状態を確認"
+        },
+        "error_language_not_registered_guild": "このサーバーはまだ登録されていません。\nまず`/設定 登録 #チャンネル`を実行してください。",
+        "error_language_not_registered_user": "まだ登録されていません。\nまず`/設定 登録`を実行してください。",
+        "error_language_update_failed": "言語の更新に失敗しました。もう一度お試しください。"
+      },
+      "errors": {
+        "not_registered": "このサーバー/アカウントは登録されていません。`/設定 登録`で先に登録してください。",
+        "no_permission": "このサーバーの登録を解除する権限がありません。",
+        "could_not_verify": "権限を確認できませんでした。もう一度お試しください。",
+        "only_own_account": "自分のアカウントのみ登録解除できます。",
+        "invalid_button_state": "ボタンの状態が無効です。`/設定 解除`をもう一度実行してください。"
+      }
+    },
+
+    "report": {
+      "success": {
+        "title": "報告完了",
+        "description": "**%{incident_type}**の報告ありがとうございます。\n\n%{others_text}",
+        "footer": "報告は広範な問題の検出に役立ちます。",
+        "others_none": "最近この問題を報告した最初のユーザーです。",
+        "others_one": "過去%{interval}分間に1人の他のユーザーがこの問題を報告しました。",
+        "others_many": "過去%{interval}分間に%{count}人の他のユーザーがこの問題を報告しました。"
+      },
+      "cooldown": {
+        "title": "報告クールダウン",
+        "description": "最近報告を提出しました。\n%{time}後に再度報告できます。"
+      },
+      "intro": {
+        "title": "VRCPulseへようこそ！",
+        "description": "VRCPulseはVRChatサーバーの状態を監視し、問題が発生した際にお知らせします。",
+        "field_getting_started": "はじめに",
+        "field_getting_started_value": "1. `/設定 登録`を実行してDMアラートを登録してください\n2. `/ステータス`で現在のVRChatの状態を確認できます",
+        "field_commands": "コマンド",
+        "field_commands_value": "- `/設定 登録` - DMアラートの登録\n- `/設定 確認` - 現在の設定を表示\n- `/ステータス` - VRChatステータスダッシュボードを表示",
+        "footer": "/設定 登録を実行してアラートを受信し、報告を始めましょう！"
+      },
+      "error_guild_not_registered": "管理者がまず`/設定 登録 #チャンネル`を実行する必要があります。",
+      "error_insert_failed": "報告の送信に失敗しました。もう一度お試しください。"
+    },
+
+    "intro": {
+      "guild_join": {
+        "title": "VRCPulseへようこそ！",
+        "description": "VRCPulseはVRChatサーバーの状態を監視し、問題が発生した際にお知らせします。",
+        "field_getting_started": "はじめに",
+        "field_getting_started_value": "1. `/設定 登録 #チャンネル`を実行してこのサーバーを登録してください\n2. `/ステータス`で現在のVRChatの状態を確認できます",
+        "field_commands": "コマンド",
+        "field_commands_value": "- `/設定 登録 <チャンネル>` - 登録とアラートチャンネルの設定\n- `/設定 確認` - 現在の設定を表示\n- `/ステータス` - VRChatステータスダッシュボードを表示",
+        "footer": "VRCPulseをサーバーに追加していただきありがとうございます！"
+      }
+    },
+
+    "alerts": {
+      "threshold": {
+        "title": "大量の報告を検出",
+        "description": "過去%{interval}分間に**%{count}**人のユーザーが**%{incident_type}**を報告しました。",
+        "field_recent_reports": "最近の報告",
+        "no_recent_reports": "最近の報告なし",
+        "footer": "/ステータスで公式VRChatステータスを確認してください"
+      }
+    },
+
+    "hello": {
+      "message": "こんにちは、%{user}さん！ 👋"
+    }
+  },
+
+  "buttons": {
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "yes_unregister": "はい、解除します"
+  },
+
+  "errors": {
+    "unknown_command": "不明なコマンド",
+    "missing_incident_type": "問題の種類が指定されていません",
+    "details_too_long": "詳細は%{max}文字以内にしてください。\n%{current}文字入力されています。",
+    "generic": "エラーが発生しました。もう一度お試しください。"
+  },
+
+  "charts": {
+    "online_users": "オンラインユーザー",
+    "api_latency": "APIレイテンシー",
+    "api_requests": "APIリクエスト",
+    "api_error_rate": "APIエラー率",
+    "steam_auth_rate": "Steam認証成功率",
+    "meta_auth_rate": "Meta認証成功率"
+  },
+
+  "time": {
+    "just_now": "たった今",
+    "min_ago_one": "1分前",
+    "min_ago_many": "%{n}分前"
+  },
+
+  "incident_types": {
+    "login": "ログインの問題",
+    "instance": "インスタンス/ワールドの読み込み",
+    "api": "API/ウェブサイトの問題",
+    "auth": "認証の問題",
+    "download": "コンテンツダウンロードの問題",
+    "other": "その他の問題"
+  },
+
+  "status": {
+    "unknown": "不明"
+  },
+
+  "components": {
+    "API / Website": "API / ウェブサイト",
+    "Realtime Networking": "リアルタイムネットワーキング",
+    "Authentication / Login": "認証 / ログイン",
+    "Social / Friends List": "ソーシャル / フレンドリスト",
+    "SDK Asset Uploads": "Unity SDKアセットアップロード",
+    "Realtime Player State Changes": "リアルタイムプレイヤー状態変更",
+    "USA, West (San José)": "アメリカ西部（サンノゼ）",
+    "USA, East (Washington D.C.)": "アメリカ東部（ワシントンD.C.）",
+    "Europe (Amsterdam)": "ヨーロッパ（アムステルダム）",
+    "Japan (Tokyo)": "日本（東京）"
+  }
+}

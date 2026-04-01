@@ -52,6 +52,6 @@ export async function getInsight(): Promise<InsightApiResponse> {
   return fetchApi('/insights/latest');
 }
 
-export async function getTranslation(type: 'incident' | 'maintenance', id: string, locale: string = 'ko'): Promise<TranslationResponse> {
+export async function getTranslation(type: 'incident' | 'maintenance', id: string, locale: string): Promise<TranslationResponse> {
   return fetchApi(`/translate?type=${type}&id=${encodeURIComponent(id)}&locale=${locale}`);
 }

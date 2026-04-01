@@ -16,6 +16,7 @@
     if (!bundle) return null;
     const locale = getLocale();
     if (locale === 'ko') return bundle.ko ?? bundle.en;
+    if (locale === 'jp') return bundle.jp ?? bundle.en;
     return bundle.en ?? bundle.ko;
   });
 

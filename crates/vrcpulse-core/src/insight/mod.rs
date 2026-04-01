@@ -20,6 +20,7 @@ use gemini_client::{GeminiClient, InsightError};
 
 const ANALYSIS_INTERVAL_SECS: u64 = 3600; // 1 hour
 pub const MODEL_ID: &str = "gemini-3.1-flash-lite-preview";
+const TRANSLATION_LOCALES: &[&str] = &["ko", "jp"];
 
 /// Trigger types for the analysis task.
 #[derive(Debug, Clone)]
@@ -110,24 +111,30 @@ pub async fn run_analysis_task(
                     InsightTrigger::IncidentDetected { incident_id, .. } => {
                         let svc = crate::service::VrcPulseService::new(db.clone())
                             .with_gemini_key(Some(translate_api_key.clone()));
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        if let Err(e) = svc.translate_content("incident", incident_id, "ko").await {
-                            warn!("Auto-translate incident failed: {e}");
-                        } else {
-                            info!(incident_id = %incident_id, "Auto-translated new incident");
+                        for locale in TRANSLATION_LOCALES {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            if let Err(e) =
+                                svc.translate_content("incident", incident_id, locale).await
+                            {
+                                warn!(locale = locale, "Auto-translate incident failed: {e}");
+                            } else {
+                                info!(incident_id = %incident_id, locale = locale, "Auto-translated new incident");
+                            }
                         }
                     }
                     InsightTrigger::MaintenanceDetected { maintenance_id } => {
                         let svc = crate::service::VrcPulseService::new(db.clone())
                             .with_gemini_key(Some(translate_api_key.clone()));
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        if let Err(e) = svc
-                            .translate_content("maintenance", maintenance_id, "ko")
-                            .await
-                        {
-                            warn!("Auto-translate maintenance failed: {e}");
-                        } else {
-                            info!(maintenance_id = %maintenance_id, "Auto-translated new maintenance");
+                        for locale in TRANSLATION_LOCALES {
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            if let Err(e) = svc
+                                .translate_content("maintenance", maintenance_id, locale)
+                                .await
+                            {
+                                warn!(locale = locale, "Auto-translate maintenance failed: {e}");
+                            } else {
+                                info!(maintenance_id = %maintenance_id, locale = locale, "Auto-translated new maintenance");
+                            }
                         }
                     }
                     _ => {}
@@ -185,24 +192,27 @@ async fn run_single_analysis(
     if matches!(trigger, InsightTrigger::Scheduled)
         && let Ok(true) = hash_exists(db, &source_hash).await
     {
-        // Check if the latest cycle has both languages before skipping
+        // Check if the latest cycle has all languages before skipping
         if let Ok(true) = latest_cycle_complete(db).await {
-            debug!("Skipping analysis: source_hash unchanged and both languages present");
+            debug!("Skipping analysis: source_hash unchanged and all languages present");
             return Ok(false);
         }
-        // English exists but Korean missing — retry translation only
+        // English exists but translations missing — retry translation only
         if let Some((en_insight, cycle_id)) = get_latest_english_only_cycle(db).await? {
-            debug!("Source hash unchanged, retrying Korean translation only");
-            translate_and_store(
-                db,
-                client,
-                trigger,
-                &snapshot,
-                &en_insight,
-                &source_hash,
-                &cycle_id,
-            )
-            .await;
+            debug!("Source hash unchanged, retrying missing translations only");
+            for locale in TRANSLATION_LOCALES {
+                translate_and_store(
+                    db,
+                    client,
+                    trigger,
+                    &snapshot,
+                    &en_insight,
+                    &source_hash,
+                    &cycle_id,
+                    locale,
+                )
+                .await;
+            }
             return Ok(true);
         }
         debug!("Source hash unchanged but translation missing, regenerating");
@@ -227,22 +237,26 @@ async fn run_single_analysis(
     .await
     .map_err(|e| InsightError::ParseFailed(format!("DB write error: {e}")))?;
 
-    // Step 6: Translate to Korean with retry
-    translate_and_store(
-        db,
-        client,
-        trigger,
-        &snapshot,
-        &en_response,
-        &source_hash,
-        &cycle_id,
-    )
-    .await;
+    // Step 6: Translate to all target locales with retry
+    for locale in TRANSLATION_LOCALES {
+        translate_and_store(
+            db,
+            client,
+            trigger,
+            &snapshot,
+            &en_response,
+            &source_hash,
+            &cycle_id,
+            locale,
+        )
+        .await;
+    }
 
     Ok(true)
 }
 
-/// Translate English insight to Korean and store, with 1 retry on failure.
+/// Translate English insight to the target locale and store, with 1 retry on failure.
+#[allow(clippy::too_many_arguments)]
 async fn translate_and_store(
     db: &DatabaseConnection,
     client: &GeminiClient,
@@ -251,52 +265,53 @@ async fn translate_and_store(
     en_response: &InsightResponse,
     source_hash: &str,
     cycle_id: &str,
+    locale: &str,
 ) {
     // Brief delay before translation to avoid rate limiting
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let ko_hash = format!("{source_hash}:ko");
+    let locale_hash = format!("{source_hash}:{locale}");
 
-    match client.translate_insight(en_response).await {
-        Ok(ko_response) => {
+    match client.translate_insight(en_response, locale).await {
+        Ok(response) => {
             if let Err(e) = store_insight(
                 db,
                 trigger,
                 snapshot,
-                &ko_response,
-                &ko_hash,
-                "ko",
+                &response,
+                &locale_hash,
+                locale,
                 cycle_id,
             )
             .await
             {
-                warn!(error = %e, "Failed to store Korean translation");
+                warn!(locale = locale, error = %e, "Failed to store translation");
             }
         }
         Err(e) => {
-            warn!(error = %e, "Korean translation failed, retrying in 3s...");
+            warn!(locale = locale, error = %e, "Translation failed, retrying in 3s...");
             tokio::time::sleep(Duration::from_secs(3)).await;
 
-            match client.translate_insight(en_response).await {
-                Ok(ko_response) => {
+            match client.translate_insight(en_response, locale).await {
+                Ok(response) => {
                     if let Err(e) = store_insight(
                         db,
                         trigger,
                         snapshot,
-                        &ko_response,
-                        &ko_hash,
-                        "ko",
+                        &response,
+                        &locale_hash,
+                        locale,
                         cycle_id,
                     )
                     .await
                     {
-                        warn!(error = %e, "Failed to store Korean translation on retry");
+                        warn!(locale = locale, error = %e, "Failed to store translation on retry");
                     } else {
-                        info!("Korean translation succeeded on retry");
+                        info!(locale = locale, "Translation succeeded on retry");
                     }
                 }
                 Err(e2) => {
-                    warn!(error = %e2, "Korean translation failed after retry, English-only insight stored");
+                    warn!(locale = locale, error = %e2, "Translation failed after retry, skipping locale");
                 }
             }
         }
@@ -320,16 +335,16 @@ async fn get_latest_english_only_cycle(
         _ => return Ok(None),
     };
 
-    // Check if Korean exists in this cycle
-    let ko_count = ai_insights::Entity::find()
+    // Check if all translation locales exist in this cycle
+    let translation_count = ai_insights::Entity::find()
         .filter(ai_insights::Column::CycleId.eq(&latest.cycle_id))
-        .filter(ai_insights::Column::Language.eq("ko"))
+        .filter(ai_insights::Column::Language.ne("en"))
         .count(db)
         .await
         .map_err(|e| InsightError::ParseFailed(format!("DB error: {e}")))?;
 
-    if ko_count > 0 {
-        return Ok(None); // Already has Korean
+    if translation_count >= TRANSLATION_LOCALES.len() as u64 {
+        return Ok(None); // Already has all translations
     }
 
     let en_response: InsightResponse = serde_json::from_str(&latest.summary_json)
@@ -348,7 +363,7 @@ fn generate_cycle_id() -> String {
     format!("{ts:x}-{rand:08x}")
 }
 
-/// Check if the latest cycle has both en and ko translations.
+/// Check if the latest cycle has en + all translation locales.
 async fn latest_cycle_complete(db: &DatabaseConnection) -> Result<bool, sea_orm::DbErr> {
     let latest = ai_insights::Entity::find()
         .order_by_desc(ai_insights::Column::CreatedAt)
@@ -365,7 +380,8 @@ async fn latest_cycle_complete(db: &DatabaseConnection) -> Result<bool, sea_orm:
         .count(db)
         .await?;
 
-    Ok(count >= 2)
+    // en + all translation locales
+    Ok(count > TRANSLATION_LOCALES.len() as u64)
 }
 
 async fn hash_exists(db: &DatabaseConnection, hash: &str) -> Result<bool, sea_orm::DbErr> {

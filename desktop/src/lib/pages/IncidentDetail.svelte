@@ -16,7 +16,8 @@
   let error = $state('');
 
   // Translation state
-  const isKorean = getLocale() === 'ko';
+  const currentLocale = getLocale();
+  const needsTranslation = currentLocale !== 'en';
   let translation: TranslationResponse | null = $state(null);
   let showOriginal = $state(false);
 
@@ -25,16 +26,16 @@
   }
 
   function getTitle(): string {
-    if (isKorean && translation && !showOriginal) return translation.translated_name;
+    if (needsTranslation && translation && !showOriginal) return translation.translated_name;
     return incident?.name ?? '';
   }
 
   function isTranslated(): boolean {
-    return isKorean && !!translation && !showOriginal;
+    return needsTranslation && !!translation && !showOriginal;
   }
 
   function getUpdateBody(update: { id: string; body: string }): string {
-    if (isKorean && translation && !showOriginal) {
+    if (needsTranslation && translation && !showOriginal) {
       const match = translation.translated_updates.find(
         u => u.update_id === update.id
       );
@@ -60,9 +61,9 @@
       history = histData;
       error = '';
 
-      // Auto-fetch translation for Korean locale
-      if (isKorean && incident) {
-        getTranslation('incident', incident.id, 'ko')
+      // Auto-fetch translation for non-English locale
+      if (needsTranslation && incident) {
+        getTranslation('incident', incident.id, currentLocale)
           .then(result => { translation = result; })
           .catch(() => {});
       }
@@ -147,7 +148,7 @@
             </svg>
             <span class="translate-badge">{t('translate.aiTranslated')}</span>
           </button>
-        {:else if isKorean && showOriginal}
+        {:else if needsTranslation && showOriginal}
           <button
             class="translate-btn"
             onclick={toggleOriginal}
@@ -273,9 +274,7 @@
     transition: color 200ms;
   }
   .translate-btn:hover { color: var(--accent); }
-  .translate-btn.loading { animation: sparkle-pulse 1s ease-in-out infinite; }
   .translate-btn.translated { color: var(--accent); }
-  .translate-btn.error { color: #ef4444; }
   .translate-badge {
     font-family: 'Geist Sans', sans-serif;
     font-size: 11px;

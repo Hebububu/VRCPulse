@@ -14,16 +14,17 @@
   let history: MaintenanceSnapshotResponse[] = $state([]);
   let loading = $state(true);
   let error = $state('');
-  const isKorean = getLocale() === 'ko';
+  const currentLocale = getLocale();
+  const needsTranslation = currentLocale !== 'en';
   let translation: TranslationResponse | null = $state(null);
 
   function getTitle(): string {
-    if (isKorean && translation) return translation.translated_name;
+    if (needsTranslation && translation) return translation.translated_name;
     return maintenance?.name ?? '';
   }
 
   function getDescription(): string {
-    if (isKorean && translation && translation.translated_body) return translation.translated_body;
+    if (needsTranslation && translation && translation.translated_body) return translation.translated_body;
     return maintenance?.description ?? '';
   }
 
@@ -43,8 +44,8 @@
       history = histData;
       error = '';
 
-      if (isKorean) {
-        getTranslation('maintenance', id, 'ko')
+      if (needsTranslation) {
+        getTranslation('maintenance', id, currentLocale)
           .then(result => { translation = result; })
           .catch(() => {});
       }
