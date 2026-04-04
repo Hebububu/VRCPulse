@@ -1,0 +1,116 @@
+%%{init: {'theme': 'default', 'themeVariables': {'mainBkg': '#ffffff', 'clusterBkg': '#f5f5f5', 'clusterBorder': '#cccccc'}}}%%
+flowchart TB
+    %% ── App Mount ──
+    subgraph Init ["App Mount"]
+        START(("onMount"))
+        ENV{"Environment<br/>Detection"}
+        TAURI["Tauri Desktop<br/>vrcpulse.vrcdevs.com"]
+        WEB["Web Browser<br/>localhost / relative"]
+        WIN["Window Class Detection<br/>compact | standard | expanded"]
+
+        START --> ENV
+        ENV -->|"__TAURI_INTERNALS__"| TAURI
+        ENV -->|"browser"| WEB
+        TAURI --> WIN
+    end
+
+    %% ── Data Fetch ──
+    subgraph Fetch ["Parallel Data Fetch — Promise.all()"]
+        direction LR
+        F1["getDashboard(range)<br/>Metrics + Status"]
+        F2["getIncidents('all')<br/>Unresolved + Resolved"]
+        F3["getMaintenances('all')<br/>Upcoming + Active"]
+        F4["getInsight()<br/>Latest AI Insight Bundle"]
+    end
+
+    TAURI --> Fetch
+    WEB --> Fetch
+
+    %% ── Data Processing ──
+    subgraph Process ["Data Processing"]
+        direction LR
+        CHK["checkNewIncidents()<br/>Compare with previous IDs"]
+        NOTIF["Tauri Notification<br/>new incident alert"]
+        STATUS["onStatusUpdate()<br/>Update header indicator"]
+    end
+
+    F2 --> CHK
+    CHK -->|"new incident found"| NOTIF
+    F1 --> STATUS
+
+    %% ── Chart Rendering ──
+    subgraph Charts ["Chart Rendering — ECharts"]
+        HERO["Hero Chart<br/>Online Users<br/>Area chart, large view"]
+        subgraph Grid ["Metric Grid"]
+            direction LR
+            C1["API Latency<br/>500ms threshold"]
+            C2["API Requests<br/>Line chart"]
+            C3["Error Rate<br/>Line chart"]
+            C4["Auth Metrics<br/>Steam & Oculus"]
+        end
+    end
+
+    F1 --> HERO
+    F1 --> Grid
+
+    %% ── AI Insight Rendering (highlighted) ──
+    subgraph Insight ["InsightCard Rendering"]
+        LOCALE{"getLocale()"}
+        KO["Korean<br/>bundle.ko ?? bundle.en"]
+        EN["English<br/>bundle.en ?? bundle.ko"]
+        SEV{"Severity<br/>Detection"}
+        S_STABLE["stable<br/>Green accent"]
+        S_WARN["warning<br/>Amber accent"]
+        S_CRIT["critical<br/>Red accent"]
+        STREAM["Streaming Animation<br/>Headline: 18ms/char<br/>Bullets: 12ms/char<br/>Gap: 80ms between items"]
+        META["Metadata Display<br/>Model ID, Confidence<br/>Next analysis countdown"]
+
+        LOCALE -->|"ko"| KO
+        LOCALE -->|"en / other"| EN
+        KO --> SEV
+        EN --> SEV
+        SEV -->|"stable"| S_STABLE
+        SEV -->|"warning"| S_WARN
+        SEV -->|"critical"| S_CRIT
+        S_STABLE --> STREAM
+        S_WARN --> STREAM
+        S_CRIT --> STREAM
+        STREAM --> META
+    end
+
+    F4 --> LOCALE
+
+    %% ── Feed Components ──
+    subgraph Feeds ["Incident & Maintenance Feeds"]
+        INC["IncidentFeed<br/>Timeline + impact badges"]
+        MAINT["MaintenanceFeed<br/>Scheduled windows"]
+        TRANS{"Korean<br/>locale?"}
+        TFETCH["fetchTranslations()<br/>Sequential API calls"]
+    end
+
+    F2 --> INC
+    F3 --> MAINT
+    INC & MAINT --> TRANS
+    TRANS -->|"yes"| TFETCH
+    TFETCH -.->|"translated content"| INC & MAINT
+
+    %% ── Responsive Layout ──
+    subgraph Layout ["Responsive Layout — Tauri"]
+        direction LR
+        L1["Compact<br/>Hero only, no sidebar"]
+        L2["Standard<br/>All charts + compact insight"]
+        L3["Expanded<br/>Full layout + sidebar"]
+    end
+
+    WIN --> Layout
+
+    %% ── Auto-Refresh ──
+    subgraph Refresh ["Auto-Refresh Cycle"]
+        TIMER["setInterval 30s"]
+        RANGE["TimeRangeSelector<br/>1h | 6h | 12h | 24h"]
+        REFETCH["fetchData() re-invoked"]
+    end
+
+    TIMER --> REFETCH
+    RANGE -->|"range change"| REFETCH
+    REFETCH --> Fetch

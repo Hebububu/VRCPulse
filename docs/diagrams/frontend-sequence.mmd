@@ -1,0 +1,82 @@
+%%{init: {'theme': 'default', 'themeVariables': {'mainBkg': '#ffffff', 'activationBorderColor': '#cccccc'}}}%%
+sequenceDiagram
+    autonumber
+
+    participant U as User
+    participant D as Dashboard
+    participant API as API Client
+    participant BE as Backend
+    participant IC as InsightCard
+
+    %% ── Mount ──
+    rect rgb(245, 245, 245)
+        Note over U,D: Mount
+        U->>D: Open Dashboard
+        D->>D: Detect environment (Tauri vs Web)
+    end
+
+    %% ── Parallel Fetch ──
+    rect rgb(245, 245, 245)
+        Note over D,BE: Parallel Fetch — Promise.all
+        par
+            D->>API: getDashboard(range)
+        and
+            D->>API: getIncidents('all')
+        and
+            D->>API: getMaintenances('all')
+        and
+            D->>API: getInsight()
+        end
+        API->>BE: 4 concurrent GET requests
+        BE-->>API: JSON responses
+        API-->>D: Dashboard + Incidents + Maintenances + InsightBundle
+    end
+
+    %% ── Render ──
+    rect rgb(245, 245, 245)
+        Note over D,IC: Render
+        D->>D: Render charts (ECharts — hero + metric grid)
+        D->>D: checkNewIncidents()
+        opt New incident
+            D->>U: Tauri Notification
+        end
+        D->>IC: Pass InsightBundle
+        IC->>IC: Select locale (ko → bundle.ko ?? bundle.en)
+        IC->>IC: Detect severity (stable / warning / critical)
+        Note right of IC: Streaming animation<br/>Headline 18ms/char<br/>Bullets 12ms/char<br/>80ms gap
+        IC-->>U: Animated insight display
+    end
+
+    %% ── Korean Translation ──
+    rect rgb(235, 235, 235)
+        Note over D,BE: Auto-translate (ko locale only)
+        opt getLocale() === 'ko'
+            D->>API: getTranslation() per incident & maintenance
+            API->>BE: GET /api/translations/{type}/{id}/ko
+            BE-->>D: Translated content
+        end
+    end
+
+    %% ── Auto-Refresh ──
+    rect rgb(245, 245, 245)
+        Note over D,BE: Auto-Refresh — 30s interval
+        loop Every 30s
+            D->>API: Re-fetch dashboard + incidents + insight
+            API->>BE: 3 concurrent GET requests
+            BE-->>D: Updated data
+            opt New insight ID
+                D->>IC: Re-stream new insight
+            end
+            D->>D: Reactive chart update
+        end
+    end
+
+    %% ── User Interaction ──
+    rect rgb(245, 245, 245)
+        Note over U,BE: Time Range Change
+        U->>D: Select range (1h / 6h / 12h / 24h)
+        D->>API: getDashboard(newRange)
+        API->>BE: GET /api/metrics/dashboard?range=...
+        BE-->>D: Filtered metrics
+        D->>D: Re-render charts
+    end

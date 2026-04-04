@@ -1,0 +1,90 @@
+%%{init: {'theme': 'default', 'themeVariables': {'mainBkg': '#ffffff', 'activationBorderColor': '#cccccc'}}}%%
+sequenceDiagram
+    autonumber
+
+    participant API as VRChat Statuspage API
+    participant IP as Incident Poller
+    participant DB as SQLite DB
+    participant CH as mpsc Channel
+    participant AT as Analysis Task
+    participant FE as Feature Extractor
+    participant GM as Gemini API
+    participant IS as ai_insights Table
+
+    %% ── Phase 1: Polling & Detection ──
+    rect rgb(245, 245, 245)
+        Note over API,DB: Phase 1 — Incident Detection (60s polling)
+        IP->>API: GET /incidents/unresolved.json
+        API-->>IP: Incidents JSON
+        IP->>DB: Upsert incident (id, title, impact, status)
+        DB-->>IP: New incident detected
+        IP->>DB: Store incident_updates (immutable)
+    end
+
+    %% ── Phase 2: Trigger ──
+    rect rgb(245, 245, 245)
+        Note over IP,AT: Phase 2 — Event Trigger
+        IP->>CH: InsightTrigger::IncidentDetected { id, title }
+        CH->>AT: Receive trigger (drain queued events)
+    end
+
+    %% ── Phase 3: Feature Extraction ──
+    rect rgb(235, 235, 235)
+        Note over AT,FE: Phase 3 — Feature Extraction (24h window)
+        AT->>FE: extract_features(db)
+        FE->>DB: Query metric_logs (24h window, 8 metrics)
+        DB-->>FE: Time-series data points
+        FE->>DB: Query active incidents & maintenances
+        DB-->>FE: Active incident/maintenance records
+
+        Note right of FE: Compute per metric:<br/>- current (avg last 5 points)<br/>- 24h mean & stddev<br/>- 1h delta %<br/>- anomaly (2-sigma)<br/>- trend (increasing/stable/decreasing)
+        Note right of FE: Co-occurrence flags:<br/>- auth_failure_correlated<br/>- login_churn<br/>- degradation
+
+        FE-->>AT: FeatureSnapshot
+    end
+
+    %% ── Phase 4: Deduplication ──
+    rect rgb(245, 245, 245)
+        Note over AT,DB: Phase 4 — SHA-256 Dedup Check
+        AT->>AT: compute_source_hash(trigger_type, trigger_id, snapshot)
+        AT->>DB: Check hash exists in ai_insights
+        DB-->>AT: Not found (proceed)
+    end
+
+    %% ── Phase 5: English Analysis ──
+    rect rgb(235, 235, 235)
+        Note over AT,GM: Phase 5 — EN Analysis (Gemini API)
+        AT->>GM: POST /generateContent<br/>model: gemini-3.1-flash-lite-preview<br/>FeatureSnapshot JSON<br/>responseMimeType: application/json
+        Note right of GM: Structured output schema:<br/>headline, bullets[],<br/>affected_surfaces[],<br/>reasoning_basis,<br/>confidence (0-1),<br/>severity (stable/warning/critical)
+        GM-->>AT: InsightResponse (EN)
+
+        AT->>AT: Generate cycle_id (UUID)
+        AT->>IS: Store EN insight<br/>(scope, trigger_type, source_hash,<br/>cycle_id, language="en",<br/>expires_at = now + 1h)
+    end
+
+    %% ── Phase 6: Korean Translation ──
+    rect rgb(235, 235, 235)
+        Note over AT,GM: Phase 6 — KO Translation (1s delay)
+        AT->>AT: Sleep 1s (rate limit)
+        AT->>GM: POST /generateContent<br/>Translate: headline, bullets,<br/>reasoning_basis → Korean
+        GM-->>AT: InsightResponse (KO)
+        AT->>IS: Store KO insight<br/>(same cycle_id, language="ko")
+
+        alt Translation fails
+            AT->>AT: Retry after 3s (max 1 retry)
+            AT->>GM: Retry translation request
+            GM-->>AT: InsightResponse (KO)
+            AT->>IS: Store KO insight
+        end
+    end
+
+    %% ── Phase 7: Auto-translate Content ──
+    rect rgb(245, 245, 245)
+        Note over AT,GM: Phase 7 — Auto-translate Incident Content (5s delay)
+        AT->>AT: Sleep 5s
+        AT->>DB: Load incident (name, body, updates)
+        DB-->>AT: Incident content
+        AT->>GM: Translate incident content → Korean
+        GM-->>AT: Translated content
+        AT->>DB: Store in translations table
+    end

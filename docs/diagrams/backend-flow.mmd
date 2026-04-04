@@ -1,0 +1,97 @@
+%%{init: {'theme': 'default', 'themeVariables': {'mainBkg': '#ffffff', 'clusterBkg': '#f5f5f5', 'clusterBorder': '#cccccc'}}}%%
+flowchart TB
+    subgraph Sources ["External Data Sources"]
+        CF["CloudFront CDN<br/>d31qqo63tn8lj0.cloudfront.net"]
+        SP["Atlassian Statuspage API<br/>status.vrchat.com/api/v2"]
+    end
+
+    subgraph Polling ["Tokio Concurrent Pollers"]
+        direction LR
+        P1["Status Poller<br/>60s interval"]
+        P2["Incident Poller<br/>60s interval"]
+        P3["Maintenance Poller<br/>60s interval"]
+        P4["Metrics Poller<br/>60s interval"]
+    end
+
+    SP --> P1 & P2 & P3
+    CF --> P4
+
+    subgraph Dedup ["Deduplication"]
+        direction LR
+        D1["Check<br/>source_timestamp"]
+        D2["Upsert by ID<br/>+ resolution detect"]
+        D3["Upsert by ID<br/>+ completion detect"]
+        D4["Check latest<br/>timestamp per metric"]
+    end
+
+    P1 --> D1
+    P2 --> D2
+    P3 --> D3
+    P4 --> D4
+
+    subgraph Storage ["SQLite + Sea-ORM"]
+        direction LR
+        T1[("status_logs<br/>component_logs")]
+        T2[("incidents<br/>incident_updates")]
+        T3[("maintenances")]
+        T4[("metric_logs<br/>8 metrics")]
+        T5[("ai_insights<br/>en + ko")]
+    end
+
+    D1 --> T1
+    D2 --> T2
+    D3 --> T3
+    D4 --> T4
+
+    subgraph AI ["AI Insight Pipeline"]
+        direction TB
+        TR{"Trigger<br/>Scheduled 1h | Incident | Maintenance"}
+        FE["Feature Extraction<br/>24h window<br/>mean, stddev, delta%<br/>2-sigma anomaly, trend"]
+        CO["Co-occurrence Analysis<br/>auth_failure_correlated<br/>login_churn, degradation"]
+        HASH{"SHA-256<br/>Dedup Check"}
+        SKIP(["Skip — unchanged"])
+        GEN["Gemini API — EN Analysis<br/>gemini-3.1-flash-lite-preview<br/>Structured JSON Output<br/>30s timeout"]
+        STORE_EN["Store EN Insight<br/>cycle_id + 1h expiry"]
+        DELAY["1s delay"]
+        GKO["Gemini API — KO Translation<br/>15s timeout, retry 1x"]
+        STORE_KO["Store KO Insight<br/>same cycle_id"]
+        AUTO["Auto-translate<br/>incident/maintenance content<br/>5s delay"]
+
+        TR --> FE
+        FE --> CO
+        CO --> HASH
+        HASH -->|"hash exists<br/>& cycle complete"| SKIP
+        HASH -->|"new hash"| GEN
+        GEN --> STORE_EN
+        STORE_EN --> DELAY
+        DELAY --> GKO
+        GKO --> STORE_KO
+        STORE_KO --> AUTO
+    end
+
+    T2 & T3 -->|"event trigger<br/>mpsc channel"| TR
+    T4 -->|"scheduled<br/>ticker 1h"| TR
+    FE -.->|"query 24h data"| T4
+    FE -.->|"active incidents"| T2
+    STORE_EN --> T5
+    STORE_KO --> T5
+    AUTO -->|"translations table"| Storage
+
+    ERR["Error Handler<br/>Rate limit: wait 120s<br/>Other: wait 60s<br/>Extend latest expiry"]
+    GEN -->|"error"| ERR
+    ERR -.->|"extend expiry"| T5
+
+    subgraph API ["Axum HTTP Endpoints"]
+        direction LR
+        A1["GET /api/metrics/dashboard<br/>5min downsampling"]
+        A2["GET /api/insights/latest<br/>non-expired, cycle_id grouped"]
+        A3["GET /api/incidents"]
+        A4["GET /api/maintenances"]
+        A5["GET /api/status"]
+    end
+
+    T4 --> A1
+    T5 --> A2
+    T2 --> A3
+    T3 --> A4
+    T1 --> A5
