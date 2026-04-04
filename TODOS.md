@@ -32,3 +32,13 @@
 **What:** Playwright mobile viewport test automation (390x844).
 **Why:** All UI verification depends on manual QA runs. Need regression prevention for mobile media query changes.
 **Status:** Not started. No Playwright config or mobile viewport tests exist.
+
+## RPM Package Panic Fix
+**What:** Fix panic crash when launching the RPM-packaged desktop app.
+**Why:** Likely caused by lack of native Wayland support in the current build configuration. The app panics on startup on Wayland-based Linux environments distributed via RPM.
+**Status:** Not started. Need to investigate Wayland-related panic trace and apply appropriate fix (e.g., Wayland feature flags, fallback to XWayland).
+
+## Migrate Frontend Dependencies to Bun
+**What:** Replace npm with Bun as the frontend package manager and runtime.
+**Why:** Bun offers significantly faster install and build times compared to npm. Simplifies the frontend toolchain.
+**Status:** Not started. Currently using npm with `package-lock.json` in `desktop/`.
