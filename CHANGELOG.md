@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.7.0 (2026-04-04)
+
+### Added
+
+- Component status grid with hierarchical grouping (API/Website, Realtime Networking)
+- Individual component status cards with 90-bucket history bars
+- Component history API endpoint with bucketed status data (`/api/components`)
+- i18n support for component status labels (EN, KO, JP)
+- ARIA attributes and keyboard accessibility for status grid
+
+### Fixed
+
+- Tauri desktop app now uses `localhost` API in dev mode instead of production URL
+
 ## 2.6.0 (2026-04-04)
 
 ### Refactored
