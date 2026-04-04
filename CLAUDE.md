@@ -11,12 +11,15 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - `/plan-eng-review` - Plan engineering review
 - `/plan-design-review` - Plan design review
 - `/design-consultation` - Design consultation
+- `/design-shotgun` - Design shotgun
+- `/design-html` - Design HTML
 - `/review` - Code review
 - `/ship` - Ship
 - `/land-and-deploy` - Land and deploy
 - `/canary` - Canary
 - `/benchmark` - Benchmark
 - `/browse` - Web browsing
+- `/connect-chrome` - Connect Chrome
 - `/qa` - QA
 - `/qa-only` - QA only
 - `/design-review` - Design review
@@ -28,11 +31,14 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - `/codex` - Codex
 - `/cso` - CSO
 - `/autoplan` - Autoplan
+- `/plan-devex-review` - Plan devex review
+- `/devex-review` - Devex review
 - `/careful` - Careful mode
 - `/freeze` - Freeze
 - `/guard` - Guard
 - `/unfreeze` - Unfreeze
 - `/gstack-upgrade` - Upgrade gstack
+- `/learn` - Learn
 
 ## Release Process
 All commits to `main` use the message format `release: X.Y.Z`.
