@@ -1,10 +1,13 @@
-import type { DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, InsightApiResponse, MaintenancesListResponse, MaintenanceSnapshotResponse, Maintenance, TranslationResponse } from './types';
+import type { ComponentStatus, DashboardResponse, IncidentsListResponse, IncidentSnapshotResponse, InsightApiResponse, MaintenancesListResponse, MaintenanceSnapshotResponse, Maintenance, TranslationResponse } from './types';
 
 function getApiBase(): string {
   if (typeof window === 'undefined') return 'http://localhost:3000/api';
 
-  // Tauri app: use the deployed web server API
+  // Tauri app: use localhost in dev, deployed server in production
   if ('__TAURI_INTERNALS__' in window) {
+    if (import.meta.env.DEV) {
+      return 'http://localhost:3000/api';
+    }
     return 'https://vrcpulse.vrcdevs.com/api';
   }
 
@@ -50,6 +53,10 @@ export async function getMaintenanceHistory(maintenanceId: string): Promise<Main
 
 export async function getInsight(): Promise<InsightApiResponse> {
   return fetchApi('/insights/latest');
+}
+
+export async function getComponentStatuses(range: string = '24h'): Promise<ComponentStatus[]> {
+  return fetchApi(`/components?range=${range}`);
 }
 
 export async function getTranslation(type: 'incident' | 'maintenance', id: string, locale: string): Promise<TranslationResponse> {

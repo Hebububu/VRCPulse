@@ -2,10 +2,12 @@
 //!
 //! Loads metric data from SQLite and performs downsampling.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 
-use crate::entity::metric_logs;
+use crate::entity::{component_logs, metric_logs};
 
 /// Default time range in hours for metric queries
 pub const DEFAULT_HOURS_RANGE: i64 = 12;
@@ -132,6 +134,141 @@ pub async fn load_metric_as_percent(
     Ok(to_percent(downsample(data)))
 }
 
+/// Default number of buckets for component status history bars
+pub const DEFAULT_BUCKET_COUNT: usize = 90;
+
+/// Bucketed component status history for rendering status bars
+#[derive(Debug, Clone)]
+pub struct ComponentBuckets {
+    pub component_id: String,
+    pub name: String,
+    pub current_status: String,
+    pub buckets: Vec<String>,
+}
+
+/// Load component history from database within a time range
+pub async fn load_component_history(
+    db: &DatabaseConnection,
+    hours: i64,
+) -> Result<Vec<component_logs::Model>, sea_orm::DbErr> {
+    let cutoff = Utc::now() - Duration::hours(hours);
+
+    component_logs::Entity::find()
+        .filter(component_logs::Column::SourceTimestamp.gte(cutoff))
+        .order_by_asc(component_logs::Column::ComponentId)
+        .order_by_asc(component_logs::Column::SourceTimestamp)
+        .all(db)
+        .await
+}
+
+/// Load the latest status per component (not range-limited)
+pub async fn load_latest_component_statuses(
+    db: &DatabaseConnection,
+) -> Result<Vec<component_logs::Model>, sea_orm::DbErr> {
+    // Get all component logs ordered by timestamp desc, then deduplicate by component_id
+    let all = component_logs::Entity::find()
+        .order_by_desc(component_logs::Column::SourceTimestamp)
+        .all(db)
+        .await?;
+
+    let mut seen = std::collections::HashSet::new();
+    let latest: Vec<component_logs::Model> = all
+        .into_iter()
+        .filter(|m| seen.insert(m.component_id.clone()))
+        .collect();
+
+    Ok(latest)
+}
+
+/// Status severity ranking (higher = worse)
+fn status_severity(status: &str) -> u8 {
+    match status {
+        "operational" => 0,
+        "degraded_performance" => 1,
+        "partial_outage" => 2,
+        "major_outage" => 3,
+        _ => 0, // unknown statuses treated as operational for "worst" comparison
+    }
+}
+
+/// Bucket component history into fixed-size time slots.
+///
+/// Each bucket represents a time window. The bucket value is the worst status
+/// seen in that window. Buckets with no data are set to "unknown".
+pub fn bucket_component_history(
+    history: &[component_logs::Model],
+    latest_statuses: &[component_logs::Model],
+    range_start: DateTime<Utc>,
+    range_end: DateTime<Utc>,
+    bucket_count: usize,
+) -> Vec<ComponentBuckets> {
+    let total_duration = (range_end - range_start).num_seconds() as f64;
+    let bucket_duration = total_duration / bucket_count as f64;
+
+    // Group history by component_id
+    let mut grouped: HashMap<String, Vec<&component_logs::Model>> = HashMap::new();
+    for model in history {
+        grouped
+            .entry(model.component_id.clone())
+            .or_default()
+            .push(model);
+    }
+
+    // Build a map of latest statuses by component_id
+    let mut latest_map: HashMap<String, &component_logs::Model> = HashMap::new();
+    for model in latest_statuses {
+        latest_map
+            .entry(model.component_id.clone())
+            .or_insert(model);
+    }
+
+    // Ensure all known components appear (even if no history in range)
+    for model in latest_statuses {
+        grouped.entry(model.component_id.clone()).or_default();
+    }
+
+    let mut results: Vec<ComponentBuckets> = grouped
+        .into_iter()
+        .map(|(component_id, entries)| {
+            let name = entries
+                .first()
+                .map(|e| e.name.clone())
+                .or_else(|| latest_map.get(&component_id).map(|m| m.name.clone()))
+                .unwrap_or_default();
+
+            let current_status = latest_map
+                .get(&component_id)
+                .map(|m| m.status.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let mut buckets = vec!["unknown".to_string(); bucket_count];
+
+            for entry in &entries {
+                let offset = (entry.source_timestamp - range_start).num_seconds() as f64;
+                let idx = (offset / bucket_duration) as usize;
+                if idx < bucket_count {
+                    let current = &buckets[idx];
+                    if current == "unknown"
+                        || status_severity(&entry.status) > status_severity(current)
+                    {
+                        buckets[idx] = entry.status.clone();
+                    }
+                }
+            }
+
+            ComponentBuckets {
+                component_id,
+                name,
+                current_status,
+                buckets,
+            }
+        })
+        .collect();
+
+    results.sort_by(|a, b| a.name.cmp(&b.name));
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +357,132 @@ mod tests {
     fn test_metric_data_max() {
         let data = make_data(vec![5.0, 15.0, 10.0], 1);
         assert_eq!(data.max(), 15.0);
+    }
+
+    // --- Component bucketing tests ---
+
+    fn make_component_log(
+        component_id: &str,
+        name: &str,
+        status: &str,
+        ts: DateTime<Utc>,
+    ) -> component_logs::Model {
+        component_logs::Model {
+            id: 0,
+            component_id: component_id.to_string(),
+            name: name.to_string(),
+            status: status.to_string(),
+            source_timestamp: ts,
+            created_at: ts,
+        }
+    }
+
+    #[test]
+    fn test_bucket_empty_input() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+        let result = bucket_component_history(&[], &[], start, end, 90);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_bucket_single_component_all_operational() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+
+        // Create entries every 16 minutes (90 buckets over 24h = ~16 min each)
+        let history: Vec<component_logs::Model> = (0..90)
+            .map(|i| {
+                make_component_log(
+                    "c1",
+                    "API",
+                    "operational",
+                    start + Duration::minutes(i * 16),
+                )
+            })
+            .collect();
+
+        let latest = vec![make_component_log("c1", "API", "operational", end)];
+
+        let result = bucket_component_history(&history, &latest, start, end, 90);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "API");
+        assert_eq!(result[0].current_status, "operational");
+        assert!(result[0].buckets.iter().all(|b| b == "operational"));
+    }
+
+    #[test]
+    fn test_bucket_worst_status_wins() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+        let bucket_duration_secs = (24 * 3600) / 90; // ~960 seconds per bucket
+
+        // Two entries in the same bucket: operational and major_outage
+        let ts1 = start + Duration::seconds(10);
+        let ts2 = start + Duration::seconds(bucket_duration_secs as i64 / 2);
+
+        let history = vec![
+            make_component_log("c1", "API", "operational", ts1),
+            make_component_log("c1", "API", "major_outage", ts2),
+        ];
+        let latest = vec![make_component_log("c1", "API", "operational", end)];
+
+        let result = bucket_component_history(&history, &latest, start, end, 90);
+        assert_eq!(result[0].buckets[0], "major_outage");
+    }
+
+    #[test]
+    fn test_bucket_gaps_are_unknown() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+
+        // Only one entry at the very start
+        let history = vec![make_component_log(
+            "c1",
+            "API",
+            "operational",
+            start + Duration::seconds(10),
+        )];
+        let latest = vec![make_component_log("c1", "API", "operational", end)];
+
+        let result = bucket_component_history(&history, &latest, start, end, 90);
+        assert_eq!(result[0].buckets[0], "operational");
+        // All other buckets should be "unknown"
+        assert!(result[0].buckets[1..].iter().all(|b| b == "unknown"));
+    }
+
+    #[test]
+    fn test_bucket_multiple_components_sorted() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+        let ts = start + Duration::seconds(10);
+
+        let history = vec![
+            make_component_log("c2", "Website", "operational", ts),
+            make_component_log("c1", "API", "operational", ts),
+        ];
+        let latest = vec![
+            make_component_log("c2", "Website", "operational", end),
+            make_component_log("c1", "API", "operational", end),
+        ];
+
+        let result = bucket_component_history(&history, &latest, start, end, 90);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name, "API");
+        assert_eq!(result[1].name, "Website");
+    }
+
+    #[test]
+    fn test_bucket_component_no_history_in_range() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+
+        // No history entries, but latest status exists
+        let latest = vec![make_component_log("c1", "API", "degraded_performance", end)];
+
+        let result = bucket_component_history(&[], &latest, start, end, 90);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].current_status, "degraded_performance");
+        assert!(result[0].buckets.iter().all(|b| b == "unknown"));
     }
 }

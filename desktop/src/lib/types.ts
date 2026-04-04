@@ -101,6 +101,13 @@ export interface TranslationResponse {
   cached: boolean;
 }
 
+export interface ComponentStatus {
+  component_id: string;
+  name: string;
+  current_status: string;
+  buckets: string[];
+}
+
 export interface IncidentSnapshotResponse {
   incident_id: string;
   title: string;
