@@ -2,7 +2,7 @@
 
 use serenity::all::{CommandInteraction, Context};
 
-use crate::commands::shared::{defer, edit_embed};
+use crate::commands::shared::{defer, edit_embed, edit_error};
 use crate::database;
 use crate::i18n::resolve_locale_async;
 use crate::repository::{GuildConfigRepository, UserConfigRepository};
@@ -26,17 +26,37 @@ pub async fn handle_show(
         ConfigContext::Guild(guild_id) => {
             let repo = GuildConfigRepository::new(db);
             match repo.get(guild_id).await {
-                Some(c) if c.enabled => embeds::show_guild_active(&c, &locale),
-                Some(c) => embeds::show_guild_disabled(&c, &locale),
-                None => embeds::show_guild_intro(&locale),
+                Ok(Some(c)) if c.enabled => embeds::show_guild_active(&c, &locale),
+                Ok(Some(c)) => embeds::show_guild_disabled(&c, &locale),
+                Ok(None) => embeds::show_guild_intro(&locale),
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to query guild config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &rust_i18n::t!("embeds.config.setup.error_registration_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
             }
         }
         ConfigContext::User(user_id) => {
             let repo = UserConfigRepository::new(db);
             match repo.get(user_id).await {
-                Some(c) if c.enabled => embeds::show_user_active(&c, &locale),
-                Some(c) => embeds::show_user_disabled(&c, &locale),
-                None => embeds::show_user_intro(&locale),
+                Ok(Some(c)) if c.enabled => embeds::show_user_active(&c, &locale),
+                Ok(Some(c)) => embeds::show_user_disabled(&c, &locale),
+                Ok(None) => embeds::show_user_intro(&locale),
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to query user config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &rust_i18n::t!("embeds.config.setup.error_registration_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
             }
         }
     };

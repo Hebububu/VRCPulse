@@ -27,8 +27,8 @@ pub fn button_id_with_context(
 /// Returns `(context_type, id)` if the custom_id matches the pattern `...:type:id`.
 pub fn parse_button_context(custom_id: &str) -> Option<(&str, &str)> {
     let parts: Vec<&str> = custom_id.split(':').collect();
-    if parts.len() >= 3 {
-        Some((parts[parts.len() - 2], parts[parts.len() - 1]))
+    if parts.len() == 3 {
+        Some((parts[1], parts[2]))
     } else {
         None
     }

@@ -2,15 +2,12 @@
 //!
 //! Handles all Discord gateway events (ready, interactions, guild joins, etc.)
 
-use chrono::Utc;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serenity::all::{
     ActivityData, ComponentInteraction, EventHandler, Guild, Interaction, Permissions, Ready,
 };
 use tracing::{error, info, warn};
 
 use crate::commands;
-use crate::entity::guild_configs;
 use crate::error::Result;
 use crate::state::AppStateKey;
 
@@ -234,44 +231,44 @@ async fn handle_intro_button(
                 return Ok(());
             };
 
-            // Update guild config to set language to Korean
-            let data = ctx.data.read().await;
-            if let Some(state) = data.get::<AppStateKey>() {
-                let state_guard = state.read().await;
-                let db = state_guard.service.db_ref();
+            // Update guild config to set language to Korean using repository
+            let db = crate::database::get_db(ctx).await;
+            let repo = crate::repository::GuildConfigRepository::new(db);
 
-                // Upsert guild config with language = "ko"
-                let existing = guild_configs::Entity::find_by_id(guild_id.to_string())
-                    .one(db)
-                    .await?;
-
-                let now = Utc::now();
-                match existing {
-                    Some(config) => {
-                        let mut active: guild_configs::ActiveModel = config.into();
-                        active.language = Set(Some("ko".to_string()));
-                        active.updated_at = Set(now);
-                        active.update(db).await?;
-                    }
-                    None => {
-                        let active = guild_configs::ActiveModel {
-                            guild_id: Set(guild_id.to_string()),
-                            language: Set(Some("ko".to_string())),
-                            enabled: Set(false),
-                            created_at: Set(now),
-                            updated_at: Set(now),
-                            ..Default::default()
-                        };
-                        active.insert(db).await?;
-                    }
+            let db_result: std::result::Result<(), sea_orm::DbErr> = match repo.get(guild_id).await {
+                Ok(Some(_)) => {
+                    // Record exists — just update language
+                    repo.update_language(guild_id, Some("ko".to_string()))
+                        .await
+                        .map(|_| ())
                 }
+                Ok(None) => {
+                    // No record — create disabled config with language only
+                    // The user must still run /config setup to provide a channel and enable
+                    repo.create_with_language(guild_id, "ko".to_string())
+                        .await
+                        .map(|_| ())
+                }
+                Err(e) => Err(e),
+            };
 
-                info!(guild_id = %guild_id, "Set guild language to Korean via intro button");
+            match db_result {
+                Ok(()) => {
+                    info!(guild_id = %guild_id, "Set guild language to Korean via intro button");
+                    let response = create_set_korean_success_response();
+                    component.create_response(&ctx.http, response).await?;
+                }
+                Err(e) => {
+                    error!(guild_id = %guild_id, error = %e, "Failed to set guild language via intro button");
+                    // Acknowledge the interaction without claiming success
+                    component
+                        .create_response(
+                            &ctx.http,
+                            serenity::all::CreateInteractionResponse::Acknowledge,
+                        )
+                        .await?;
+                }
             }
-
-            // Send confirmation (public)
-            let response = create_set_korean_success_response();
-            component.create_response(&ctx.http, response).await?;
         }
         _ => {}
     }

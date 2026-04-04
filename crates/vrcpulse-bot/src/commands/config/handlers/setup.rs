@@ -49,7 +49,19 @@ pub async fn handle_setup(
             let repo = GuildConfigRepository::new(db);
 
             // Check if already registered and enabled
-            let existing = repo.get(guild_id).await;
+            let existing = match repo.get(guild_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    error!(error = %e, "Failed to query guild config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.setup.error_registration_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            };
             if let Some(ref config) = existing
                 && config.enabled
             {
@@ -142,7 +154,19 @@ pub async fn handle_setup(
             let repo = UserConfigRepository::new(db);
 
             // Check if already registered
-            let existing = repo.get(user_id).await;
+            let existing = match repo.get(user_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    error!(error = %e, "Failed to query user config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.setup.error_registration_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            };
             if let Some(ref config) = existing
                 && config.enabled
             {

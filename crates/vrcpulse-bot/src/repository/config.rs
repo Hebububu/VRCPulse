@@ -26,12 +26,32 @@ impl GuildConfigRepository {
     }
 
     /// Get guild config by ID
-    pub async fn get(&self, guild_id: GuildId) -> Option<guild_configs::Model> {
+    pub async fn get(
+        &self,
+        guild_id: GuildId,
+    ) -> Result<Option<guild_configs::Model>, sea_orm::DbErr> {
         guild_configs::Entity::find_by_id(guild_id.to_string())
             .one(&*self.db)
             .await
-            .ok()
-            .flatten()
+    }
+
+    /// Create a disabled guild config with language preference only (no channel).
+    /// Used when setting language before the guild runs /config setup.
+    pub async fn create_with_language(
+        &self,
+        guild_id: GuildId,
+        language: String,
+    ) -> Result<guild_configs::Model, sea_orm::DbErr> {
+        let now = Utc::now();
+        let model = guild_configs::ActiveModel {
+            guild_id: Set(guild_id.to_string()),
+            channel_id: Set(None),
+            enabled: Set(false),
+            language: Set(Some(language)),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+        model.insert(&*self.db).await
     }
 
     /// Create new guild config
@@ -138,12 +158,13 @@ impl UserConfigRepository {
     }
 
     /// Get user config by ID
-    pub async fn get(&self, user_id: UserId) -> Option<user_configs::Model> {
+    pub async fn get(
+        &self,
+        user_id: UserId,
+    ) -> Result<Option<user_configs::Model>, sea_orm::DbErr> {
         user_configs::Entity::find_by_id(user_id.to_string())
             .one(&*self.db)
             .await
-            .ok()
-            .flatten()
     }
 
     /// Create new user config

@@ -14,7 +14,6 @@ use tracing::{error, info};
 use crate::commands::shared::{defer, embeds, incident_types, respond_error};
 use crate::entity::{bot_config, guild_configs, user_configs, user_reports};
 use crate::i18n::{resolve_locale, resolve_locale_async};
-use crate::state::AppStateKey;
 
 // =============================================================================
 // Constants
@@ -133,19 +132,14 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     // Now resolve locale with full DB lookup
     let locale = resolve_locale_async(ctx, interaction).await;
 
-    // Get database
-    let data = ctx.data.read().await;
-    let state = data
-        .get::<AppStateKey>()
-        .expect("AppState not found in TypeMap");
-    let state = state.read().await;
-    let db = state.service.db_ref();
+    // Get database - clone connection to avoid holding AppState lock
+    let db = crate::database::get_db(ctx).await;
 
     let user_id = interaction.user.id;
     let guild_id = interaction.guild_id;
 
     // Check registration
-    match check_registration(db, guild_id, user_id).await {
+    match check_registration(&db, guild_id, user_id).await {
         RegistrationStatus::Registered => {}
         RegistrationStatus::GuildNotRegistered => {
             return defer::edit_error(
@@ -162,7 +156,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     }
 
     // Try to insert report first (atomic operation to prevent race condition)
-    match try_insert_report(db, guild_id, user_id, incident_type, details.clone()).await {
+    match try_insert_report(&db, guild_id, user_id, incident_type, details.clone()).await {
         ReportInsertResult::Success => {
             // Report inserted successfully - continue to alert check
         }
@@ -193,11 +187,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
     }
 
     // Check threshold and send alerts if needed
-    crate::alerts::check_and_send_alerts(ctx, db, incident_type).await;
+    crate::alerts::check_and_send_alerts(ctx, &db, incident_type).await;
 
     // Get count of similar reports
-    let interval = get_report_interval(db).await;
-    let similar_count = get_similar_report_count(db, incident_type, user_id, interval).await;
+    let interval = get_report_interval(&db).await;
+    let similar_count = get_similar_report_count(&db, incident_type, user_id, interval).await;
 
     info!(
         user_id = %user_id,
@@ -328,6 +322,7 @@ async fn try_insert_report(
 
     let existing = user_reports::Entity::find()
         .filter(user_reports::Column::UserId.eq(user_id.to_string()))
+        .filter(user_reports::Column::IncidentType.eq(incident_type))
         .filter(user_reports::Column::Status.eq("active"))
         .filter(user_reports::Column::CreatedAt.gt(cutoff))
         .order_by_desc(user_reports::Column::CreatedAt)
@@ -367,6 +362,7 @@ async fn try_insert_report(
             let fresh_cutoff = Utc::now() - Duration::minutes(DUPLICATE_COOLDOWN_MINUTES);
             let reports_in_window = user_reports::Entity::find()
                 .filter(user_reports::Column::UserId.eq(user_id.to_string()))
+                .filter(user_reports::Column::IncidentType.eq(incident_type))
                 .filter(user_reports::Column::Status.eq("active"))
                 .filter(user_reports::Column::CreatedAt.gt(fresh_cutoff))
                 .order_by_asc(user_reports::Column::CreatedAt)

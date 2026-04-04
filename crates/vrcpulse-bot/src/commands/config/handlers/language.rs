@@ -37,7 +37,19 @@ pub async fn handle_language(
             let repo = GuildConfigRepository::new(db.clone());
 
             // Check if registered
-            let existing = repo.get(guild_id).await;
+            let existing = match repo.get(guild_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    error!(error = %e, "Failed to query guild config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.setup.error_language_update_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            };
             if existing.is_none() {
                 return edit_error(
                     ctx,
@@ -85,7 +97,19 @@ pub async fn handle_language(
             let repo = UserConfigRepository::new(db.clone());
 
             // Check if registered
-            let existing = repo.get(user_id).await;
+            let existing = match repo.get(user_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    error!(error = %e, "Failed to query user config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.setup.error_language_update_failed", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            };
             if existing.is_none() {
                 return edit_error(
                     ctx,

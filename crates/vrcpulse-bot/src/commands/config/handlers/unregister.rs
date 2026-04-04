@@ -35,11 +35,37 @@ pub async fn handle_unregister(
     let is_registered = match &config_context {
         ConfigContext::Guild(guild_id) => {
             let repo = GuildConfigRepository::new(db.clone());
-            repo.get(*guild_id).await.is_some_and(|c| c.enabled)
+            match repo.get(*guild_id).await {
+                Ok(Some(c)) => c.enabled,
+                Ok(None) => false,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to query guild config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.errors.not_registered", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            }
         }
         ConfigContext::User(user_id) => {
             let repo = UserConfigRepository::new(db);
-            repo.get(*user_id).await.is_some_and(|c| c.enabled)
+            match repo.get(*user_id).await {
+                Ok(Some(c)) => c.enabled,
+                Ok(None) => false,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to query user config");
+                    return edit_error(
+                        ctx,
+                        interaction,
+                        &t!("embeds.config.errors.not_registered", locale = &locale),
+                        &locale,
+                    )
+                    .await;
+                }
+            }
         }
     };
 
