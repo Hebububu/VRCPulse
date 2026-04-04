@@ -138,7 +138,8 @@ async fn main() {
             get(get_maintenance_history),
         )
         .route("/insights/latest", get(get_insights_latest))
-        .route("/translate", get(get_translate));
+        .route("/translate", get(get_translate))
+        .route("/components", get(get_components));
 
     let app = Router::new()
         .nest("/api", api_routes)
@@ -251,6 +252,21 @@ async fn get_maintenances(
     let status = params.status.as_deref().unwrap_or("upcoming");
     match state.service.get_maintenances(status).await {
         Ok(data) => Json(data).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn get_components(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<RangeQuery>,
+) -> impl IntoResponse {
+    let range = params.range.as_deref().unwrap_or("24h");
+    match state.service.get_component_statuses(range).await {
+        Ok(data) => (
+            [(axum::http::header::CACHE_CONTROL, "public, max-age=60")],
+            Json(data),
+        )
+            .into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

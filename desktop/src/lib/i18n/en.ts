@@ -85,6 +85,15 @@ export default {
   'maintenance.notFound': 'Maintenance not found',
   'maintenance.description': 'Description',
 
+  // Components
+  'component.title': 'Components',
+  'component.all_operational': 'All {n} components operational',
+  'component.operational': 'Operational',
+  'component.degraded': 'Degraded',
+  'component.partial_outage': 'Partial Outage',
+  'component.major_outage': 'Major Outage',
+  'component.unknown': 'Unknown',
+
   // AI Insight
   'insight.confidence.high': 'High',
   'insight.confidence.medium': 'Medium',

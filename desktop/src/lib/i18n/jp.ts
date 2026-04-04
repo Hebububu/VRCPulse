@@ -85,6 +85,15 @@ export default {
   'maintenance.notFound': 'メンテナンスが見つかりません',
   'maintenance.description': '説明',
 
+  // Components
+  'component.title': 'コンポーネント',
+  'component.all_operational': '全{n}コンポーネント正常',
+  'component.operational': '正常',
+  'component.degraded': 'パフォーマンス低下',
+  'component.partial_outage': '一部障害',
+  'component.major_outage': '大規模障害',
+  'component.unknown': '不明',
+
   // AI Insight
   'insight.confidence.high': '高',
   'insight.confidence.medium': '中',

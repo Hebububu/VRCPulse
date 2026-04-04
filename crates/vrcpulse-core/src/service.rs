@@ -132,6 +132,14 @@ pub struct InsightBundle {
     pub jp: Option<AiInsightResponse>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct ComponentStatusResponse {
+    pub component_id: String,
+    pub name: String,
+    pub current_status: String,
+    pub buckets: Vec<String>,
+}
+
 fn hours_from_range(range: &str) -> i64 {
     match range {
         "1h" => 1,
@@ -275,6 +283,37 @@ impl VrcPulseService {
         let status = self.get_status().await?;
 
         Ok(DashboardResponse { metrics, status })
+    }
+
+    /// Get component statuses with bucketed history for status bar rendering
+    pub async fn get_component_statuses(
+        &self,
+        range: &str,
+    ) -> Result<Vec<ComponentStatusResponse>, sea_orm::DbErr> {
+        let hours = hours_from_range(range);
+        let range_end = Utc::now();
+        let range_start = range_end - Duration::hours(hours);
+
+        let history = query::load_component_history(&self.db, hours).await?;
+        let latest = query::load_latest_component_statuses(&self.db).await?;
+
+        let bucketed = query::bucket_component_history(
+            &history,
+            &latest,
+            range_start,
+            range_end,
+            query::DEFAULT_BUCKET_COUNT,
+        );
+
+        Ok(bucketed
+            .into_iter()
+            .map(|b| ComponentStatusResponse {
+                component_id: b.component_id,
+                name: b.name,
+                current_status: b.current_status,
+                buckets: b.buckets,
+            })
+            .collect())
     }
 
     pub async fn get_incidents(

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Chart from './Chart.svelte';
+  import ComponentStatusGrid from './ComponentStatusGrid.svelte';
   import InsightCard from './InsightCard.svelte';
   import MaintenanceBanner from './MaintenanceBanner.svelte';
   import MaintenanceFeed from './MaintenanceFeed.svelte';
@@ -7,9 +8,9 @@
   import IncidentFeed from './IncidentFeed.svelte';
   import PromoBanner from './PromoBanner.svelte';
   import { onMount } from 'svelte';
-  import { getDashboard, getIncidents, getMaintenances, getInsight, getTranslation } from '../api';
+  import { getDashboard, getIncidents, getMaintenances, getInsight, getTranslation, getComponentStatuses } from '../api';
   import { t, getLocale } from '../i18n';
-  import type { InsightBundle, DashboardResponse, Incident, Maintenance, TranslationResponse } from '../types';
+  import type { ComponentStatus, InsightBundle, DashboardResponse, Incident, Maintenance, TranslationResponse } from '../types';
 
   interface Props {
     onStatusUpdate: (status: DashboardResponse['status']) => void;
@@ -61,6 +62,7 @@
   let previousIncidentIds: Set<string> = new Set();
   let insightBundle: InsightBundle | null = $state(null);
   let maintenances: Maintenance[] = $state([]);
+  let components: ComponentStatus[] = $state([]);
   let loading = $state(true);
   let error = $state('');
 
@@ -100,17 +102,19 @@
 
   async function fetchData() {
     try {
-      const [dashData, incData, maintData, insightData] = await Promise.all([
+      const [dashData, incData, maintData, insightData, compData] = await Promise.all([
         getDashboard(range),
         getIncidents('all'),
         getMaintenances('all').catch(() => ({ maintenances: [] })),
         getInsight().catch(() => ({ insight: null })),
+        getComponentStatuses(range).catch(() => [] as ComponentStatus[]),
       ]);
       dashboard = dashData;
       checkNewIncidents(incData.incidents);
       incidents = incData.incidents;
       maintenances = maintData.maintenances;
       insightBundle = insightData.insight;
+      components = compData;
       onStatusUpdate(dashData.status);
       onDataReceived();
       loading = false;
@@ -169,6 +173,8 @@
 
 <div class="dashboard" class:desktop-dashboard={isTauri} class:compact={isCompact} class:expanded={isExpanded}>
   <MaintenanceBanner {maintenances} />
+
+  <ComponentStatusGrid {components} {range} />
 
   {#if !isCompact}
     <div class="toolbar">

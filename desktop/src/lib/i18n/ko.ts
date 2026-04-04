@@ -85,6 +85,15 @@ export default {
   'maintenance.notFound': '점검을 찾을 수 없습니다',
   'maintenance.description': '설명',
 
+  // Components
+  'component.title': '컴포넌트',
+  'component.all_operational': '모든 {n}개 컴포넌트 정상',
+  'component.operational': '정상',
+  'component.degraded': '성능 저하',
+  'component.partial_outage': '부분 장애',
+  'component.major_outage': '대규모 장애',
+  'component.unknown': '알 수 없음',
+
   // AI Insight
   'insight.confidence.high': '높음',
   'insight.confidence.medium': '보통',
