@@ -3,8 +3,11 @@ import type { ComponentStatus, DashboardResponse, IncidentsListResponse, Inciden
 function getApiBase(): string {
   if (typeof window === 'undefined') return 'http://localhost:3000/api';
 
-  // Tauri app: use the deployed web server API
+  // Tauri app: use localhost in dev, deployed server in production
   if ('__TAURI_INTERNALS__' in window) {
+    if (import.meta.env.DEV) {
+      return 'http://localhost:3000/api';
+    }
     return 'https://vrcpulse.vrcdevs.com/api';
   }
 
