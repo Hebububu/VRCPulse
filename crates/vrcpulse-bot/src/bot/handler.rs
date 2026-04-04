@@ -237,7 +237,8 @@ async fn handle_intro_button(
             // Update guild config to set language to Korean
             let data = ctx.data.read().await;
             if let Some(state) = data.get::<AppStateKey>() {
-                let db = &*state.read().await.database;
+                let state_guard = state.read().await;
+                let db = state_guard.service.db_ref();
 
                 // Upsert guild config with language = "ko"
                 let existing = guild_configs::Entity::find_by_id(guild_id.to_string())

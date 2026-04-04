@@ -204,11 +204,12 @@ impl VrcPulseService {
         }
     }
 
-    pub async fn get_metrics(
+    /// Get raw metric data for chart rendering (returns MetricData with DateTime timestamps)
+    pub async fn get_metrics_raw(
         &self,
         name: &str,
         range: &str,
-    ) -> Result<MetricResponse, sea_orm::DbErr> {
+    ) -> Result<MetricData, sea_orm::DbErr> {
         let hours = hours_from_range(range);
         let cutoff = Utc::now() - Duration::hours(hours);
         let db_name = resolve_db_metric(name);
@@ -227,8 +228,30 @@ impl VrcPulseService {
             unit: data.first().map(|d| d.unit.clone()).unwrap_or_default(),
         };
 
-        let downsampled = query::downsample(metric_data);
-        Ok(metric_data_to_response(name, downsampled))
+        Ok(query::downsample(metric_data))
+    }
+
+    /// Get raw metric data as percentage (0-1 values converted to 0-100)
+    ///
+    /// Use for metrics like api_errors, extauth_steam, extauth_oculus that are
+    /// stored as 0-1 fractions but displayed as percentages.
+    pub async fn get_metrics_raw_percent(
+        &self,
+        name: &str,
+        range: &str,
+    ) -> Result<MetricData, sea_orm::DbErr> {
+        let data = self.get_metrics_raw(name, range).await?;
+        Ok(query::to_percent(data))
+    }
+
+    /// Get metric data as a JSON-serializable response (timestamps as RFC3339 strings)
+    pub async fn get_metrics(
+        &self,
+        name: &str,
+        range: &str,
+    ) -> Result<MetricResponse, sea_orm::DbErr> {
+        let data = self.get_metrics_raw(name, range).await?;
+        Ok(metric_data_to_response(name, data))
     }
 
     pub async fn get_dashboard(&self, range: &str) -> Result<DashboardResponse, sea_orm::DbErr> {

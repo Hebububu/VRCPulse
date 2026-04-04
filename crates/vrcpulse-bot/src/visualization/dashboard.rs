@@ -1,15 +1,15 @@
 //! Dashboard generation
 //!
-//! Generates a 6-chart dashboard PNG image.
+//! Generates a 6-chart dashboard PNG image using VrcPulseService for data access.
 
 use plotters::backend::BitMapBackend;
 use plotters::chart::ChartBuilder;
 use plotters::drawing::IntoDrawingArea;
 use plotters::series::{AreaSeries, LineSeries};
 use plotters::style::{Color, IntoFont, RGBColor};
-use sea_orm::DatabaseConnection;
 
-use crate::visualization::query::{MetricData, load_metric_as_percent, load_metric_downsampled};
+use vrcpulse_core::{MetricData, VrcPulseService};
+
 use crate::visualization::theme::*;
 
 /// Y-axis format for charts
@@ -37,15 +37,15 @@ pub struct DashboardStats {
 
 /// Generate dashboard PNG and return bytes with stats
 pub async fn generate_dashboard(
-    db: &DatabaseConnection,
+    service: &VrcPulseService,
 ) -> Result<(Vec<u8>, DashboardStats), Box<dyn std::error::Error + Send + Sync>> {
-    // Load all 6 metrics
-    let online_users = load_metric_downsampled(db, "visits").await?;
-    let api_latency = load_metric_downsampled(db, "api_latency").await?;
-    let api_requests = load_metric_downsampled(db, "api_requests").await?;
-    let api_error_rate = load_metric_as_percent(db, "api_errors").await?;
-    let steam_success = load_metric_as_percent(db, "extauth_steam").await?;
-    let meta_success = load_metric_as_percent(db, "extauth_oculus").await?;
+    // Load all 6 metrics via service (uses dashboard-friendly names, service maps internally)
+    let online_users = service.get_metrics_raw("online_users", "12h").await?;
+    let api_latency = service.get_metrics_raw("api_latency", "12h").await?;
+    let api_requests = service.get_metrics_raw("api_requests", "12h").await?;
+    let api_error_rate = service.get_metrics_raw_percent("api_error_rate", "12h").await?;
+    let steam_success = service.get_metrics_raw_percent("steam_auth", "12h").await?;
+    let meta_success = service.get_metrics_raw_percent("meta_auth", "12h").await?;
 
     // Calculate stats
     let stats = DashboardStats {

@@ -139,7 +139,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .get::<AppStateKey>()
         .expect("AppState not found in TypeMap");
     let state = state.read().await;
-    let db = state.database.as_ref();
+    let db = state.service.db_ref();
 
     let user_id = interaction.user.id;
     let guild_id = interaction.guild_id;

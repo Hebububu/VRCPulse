@@ -7,7 +7,6 @@ pub mod intro;
 
 pub use handler::Handler;
 
-use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection};
 use serenity::all::{Client, GatewayIntents};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -16,7 +15,7 @@ use tracing::info;
 use crate::config::Config;
 use crate::error::Result;
 use crate::state::{AppState, AppStateKey};
-use vrcpulse_core::collector;
+use vrcpulse_core::{DatabaseConfig, VrcPulseService, collector, connect_database};
 
 /// Set up and configure the Discord bot client
 ///
@@ -29,8 +28,9 @@ use vrcpulse_core::collector;
 ///
 /// Returns a configured `Client` ready to be started.
 pub async fn setup(config: &Config) -> Result<Client> {
-    // 1. Connect to database with optimized settings for SQLite
-    let database = connect_database(&config.database_url).await?;
+    // 1. Connect to database with shared factory
+    let db_config = DatabaseConfig::new(&config.database_url);
+    let database = connect_database(db_config).await?;
     info!("Database connected (WAL mode enabled)");
 
     // 2. Initialize collector config
@@ -39,8 +39,9 @@ pub async fn setup(config: &Config) -> Result<Client> {
         .expect("Failed to load collector config from database");
     info!("Collector config loaded");
 
-    // 3. Create AppState
-    let app_state = Arc::new(RwLock::new(AppState::new(database.clone(), config_tx)));
+    // 3. Create VrcPulseService and AppState
+    let service = VrcPulseService::new(database.clone());
+    let app_state = Arc::new(RwLock::new(AppState::new(service, config_tx)));
 
     // 4. Start data collector in background
     let http_client = create_http_client();
@@ -67,26 +68,6 @@ pub async fn setup(config: &Config) -> Result<Client> {
     }
 
     Ok(client)
-}
-
-/// Connect to database with optimized settings for SQLite
-async fn connect_database(database_url: &str) -> Result<DatabaseConnection> {
-    let mut db_opts = ConnectOptions::new(database_url);
-    db_opts
-        .max_connections(5)
-        .min_connections(1)
-        .acquire_timeout(std::time::Duration::from_secs(10))
-        .sqlx_logging(false); // Reduce noise, enable if debugging
-
-    let database = Database::connect(db_opts).await?;
-
-    // Enable WAL mode for better concurrency
-    database
-        .execute_unprepared("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
-        .await
-        .expect("Failed to set SQLite pragmas");
-
-    Ok(database)
 }
 
 /// Create HTTP client for API requests

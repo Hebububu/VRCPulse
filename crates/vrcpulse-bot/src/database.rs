@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use crate::state::AppStateKey;
 
-/// Get database connection from Serenity context
+/// Get database connection from Serenity context via VrcPulseService
+///
+/// Returns an Arc-wrapped clone of the DatabaseConnection from the service layer.
 ///
 /// # Panics
 /// Panics if AppState is not found in TypeMap (should never happen after bot initialization)
@@ -15,7 +17,7 @@ pub async fn get_db(ctx: &Context) -> Arc<DatabaseConnection> {
     let state = data
         .get::<AppStateKey>()
         .expect("AppState not found in TypeMap");
-    state.read().await.database.clone()
+    Arc::new(state.read().await.service.db_ref().clone())
 }
 
 /// Try to get database connection from Serenity context
@@ -24,5 +26,5 @@ pub async fn get_db(ctx: &Context) -> Arc<DatabaseConnection> {
 pub async fn try_get_db(ctx: &Context) -> Option<Arc<DatabaseConnection>> {
     let data = ctx.data.read().await;
     let state = data.get::<AppStateKey>()?;
-    Some(state.read().await.database.clone())
+    Some(Arc::new(state.read().await.service.db_ref().clone()))
 }

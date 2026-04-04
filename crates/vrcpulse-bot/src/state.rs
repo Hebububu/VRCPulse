@@ -1,11 +1,10 @@
 use chrono::{DateTime, Utc};
-use sea_orm::DatabaseConnection;
 use serenity::all::GuildId;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use vrcpulse_core::CollectorConfigTx;
+use vrcpulse_core::{CollectorConfigTx, VrcPulseService};
 
 /// TypeMap key for AppState access
 pub struct AppStateKey;
@@ -18,8 +17,9 @@ impl serenity::prelude::TypeMapKey for AppStateKey {
 /// - Accessible via `TypeMap` in Serenity event handlers
 #[allow(dead_code)]
 pub struct AppState {
-    /// Database connection
-    pub database: Arc<DatabaseConnection>,
+    /// Shared service for data queries (metrics, status, incidents)
+    /// Also provides `db_ref()` for bot-specific table access
+    pub service: VrcPulseService,
     /// Collector config sender for dynamic interval updates
     pub collector_config: CollectorConfigTx,
     /// Bot startup timestamp
@@ -32,9 +32,9 @@ pub struct AppState {
 
 impl AppState {
     /// Create a new AppState instance
-    pub fn new(database: DatabaseConnection, collector_config: CollectorConfigTx) -> Self {
+    pub fn new(service: VrcPulseService, collector_config: CollectorConfigTx) -> Self {
         Self {
-            database: Arc::new(database),
+            service,
             collector_config,
             started_at: Utc::now(),
             pending_intros: HashSet::new(),

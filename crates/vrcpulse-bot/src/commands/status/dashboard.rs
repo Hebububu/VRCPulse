@@ -9,7 +9,7 @@ use serenity::all::{
 use tracing::error;
 
 use crate::commands::shared::{colors, defer, embeds};
-use crate::entity::{component_logs, status_logs};
+use crate::entity::component_logs;
 use crate::i18n::resolve_locale_async;
 use crate::state::AppStateKey;
 use crate::visualization::generate_dashboard;
@@ -29,24 +29,18 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
 
     let locale = resolve_locale_async(ctx, interaction).await;
 
-    // Get database from AppState
+    // Get service from AppState
     let data = ctx.data.read().await;
     let state = data
         .get::<AppStateKey>()
         .expect("AppState not found in TypeMap");
     let state = state.read().await;
-    let db = state.database.as_ref();
 
-    // Fetch system status
-    let system_status = status_logs::Entity::find()
-        .order_by_desc(status_logs::Column::SourceTimestamp)
-        .one(db)
-        .await
-        .ok()
-        .flatten();
+    // Fetch system status via service
+    let system_status = state.service.get_status().await.ok();
 
-    // Fetch latest component statuses (limit to recent data to avoid loading entire history)
-    // We only need the most recent status for each component
+    // Fetch latest component statuses (bot-specific: uses hardcoded VRChat component group IDs)
+    let db = state.service.db_ref();
     use chrono::{Duration, Utc};
 
     let recent_cutoff = Utc::now() - Duration::hours(24);
@@ -64,8 +58,8 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .filter(|c| seen_components.insert(c.component_id.clone()))
         .collect();
 
-    // Generate dashboard
-    let result = generate_dashboard(db).await;
+    // Generate dashboard via service
+    let result = generate_dashboard(&state.service).await;
 
     match result {
         Ok((png_bytes, stats)) => {

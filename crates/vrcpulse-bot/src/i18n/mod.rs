@@ -164,10 +164,10 @@ pub fn get_language_display_name(code: Option<&str>, locale: &str) -> String {
 // Database Helpers
 // =============================================================================
 
-async fn get_db(ctx: &Context) -> Option<std::sync::Arc<DatabaseConnection>> {
+async fn get_db(ctx: &Context) -> Option<DatabaseConnection> {
     let data = ctx.data.read().await;
     let state = data.get::<AppStateKey>()?;
-    Some(state.read().await.database.clone())
+    Some(state.read().await.service.db_ref().clone())
 }
 
 async fn get_guild_language(db: &DatabaseConnection, guild_id: GuildId) -> Option<String> {

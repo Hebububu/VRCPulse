@@ -7,13 +7,12 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use sea_orm::{ConnectOptions, ConnectionTrait, Database};
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tracing::info;
 
-use vrcpulse_core::VrcPulseService;
+use vrcpulse_core::{DatabaseConfig, VrcPulseService, connect_database};
 
 struct AppState {
     service: VrcPulseService,
@@ -56,21 +55,10 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    // Connect to database
-    let mut db_opts = ConnectOptions::new(&database_url);
-    db_opts
-        .max_connections(5)
-        .min_connections(1)
-        .sqlx_logging(false);
-
-    let database = Database::connect(db_opts)
+    // Connect to database using shared factory
+    let database = connect_database(DatabaseConfig::new(&database_url))
         .await
         .expect("Failed to connect to database");
-
-    database
-        .execute_unprepared("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
-        .await
-        .expect("Failed to set SQLite pragmas");
 
     info!("Database connected");
 
