@@ -25,6 +25,11 @@ export function t(key: TranslationKey): string {
   return translations[current]?.[key] ?? translations['en'][key] ?? key;
 }
 
+export function tDynamic(key: string): string {
+  const current = get(locale);
+  return translations[current]?.[key] ?? translations['en']?.[key] ?? key;
+}
+
 export function getLocale(): string {
   return get(locale);
 }

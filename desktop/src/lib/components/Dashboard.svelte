@@ -174,8 +174,6 @@
 <div class="dashboard" class:desktop-dashboard={isTauri} class:compact={isCompact} class:expanded={isExpanded}>
   <MaintenanceBanner {maintenances} />
 
-  <ComponentStatusGrid {components} {range} />
-
   {#if !isCompact}
     <div class="toolbar">
       <TimeRangeSelector value={range} onChange={handleRangeChange} />
@@ -192,6 +190,8 @@
   {#if showInsight}
     <InsightCard bundle={insightBundle} mode={insightMode} />
   {/if}
+
+  <ComponentStatusGrid {components} {range} />
 
   <div class="main-area">
     <div class="charts-area">
@@ -281,9 +281,10 @@
     min-width: 0;
   }
 
-  /* Desktop Tauri: no scroll on dashboard */
+  /* Desktop Tauri: fixed height with scroll */
   .desktop-dashboard {
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     height: calc(100vh - 56px); /* Viewport minus StatusBar */
   }
 
