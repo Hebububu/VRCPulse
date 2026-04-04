@@ -23,6 +23,11 @@
 **Why:** 9+ frontend components/pages have no automated tests. InsightCard locale switching, MaintenanceBanner conditional render, filter behavior all rely on manual QA.
 **Status:** Not started. No vitest config, no @testing-library/svelte dependency, no test files.
 
+## Bot CI/CD Pipeline
+**What:** Add GitHub Actions workflow and update Dockerfile for `vrcpulse-bot` crate deployment.
+**Why:** Root `Dockerfile` is outdated — references old single-crate `src/main.rs` layout, not the current workspace structure under `crates/vrcpulse-bot/`. Bot has no automated deploy pipeline.
+**Status:** Not started. Need to update `Dockerfile` for workspace build and add a deploy workflow (similar to `deploy.yml` for web server).
+
 ## Mobile QA Test Automation
 **What:** Playwright mobile viewport test automation (390x844).
 **Why:** All UI verification depends on manual QA runs. Need regression prevention for mobile media query changes.
