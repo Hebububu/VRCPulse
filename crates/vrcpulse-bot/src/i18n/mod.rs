@@ -12,7 +12,7 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, GuildId, UserId};
 
 use crate::entity::{guild_configs, user_configs};
-use crate::state::AppStateKey;
+use crate::infrastructure::state::AppStateKey;
 
 /// Default locale
 pub const DEFAULT_LOCALE: &str = "en";
