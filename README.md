@@ -27,18 +27,21 @@ Monitor VRChat server status, API latency, error rates, and incident history wit
 ## Features
 
 ### Desktop App (Tauri v2)
+
 - Native app for **macOS**, **Windows**, and **Linux**
 - System tray with color-coded status indicator
 - Native OS notifications on VRChat status changes
 - Auto-updater with one-click update
 
 ### Web Dashboard
+
 - Live-updating dashboard at your own domain
 - 7 interactive charts: Online Users, API Latency, API Requests, Error Rate, Steam Auth, Meta Auth, Platform Share
 - Time range selector (1h / 6h / 12h / 24h)
 - Incident history with full timeline and change tracking
 
 ### Discord Bot
+
 - `/status` command with visualized dashboard charts
 - `/report` command for user incident reporting
 - `/config` command for alert channel setup
@@ -47,42 +50,38 @@ Monitor VRChat server status, API latency, error rates, and incident history wit
 
 ## Architecture
 
-```
-VRChat Status API
-       │
-       ▼
-vrcpulse-core (collector + service layer)
-       │
-       ├── vrcpulse-bot (Discord)
-       ├── vrcpulse-server (Axum + Web)
-       └── desktop (Tauri v2 + Svelte)
-```
+<div align="center">
+<img src="./images/architecture.png", alt="VRCPulse architecture" width="800"/>
+</div>
 
 4-crate Cargo workspace sharing a common core library.
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Core | Rust, Tokio, SeaORM, SQLite |
-| Desktop | Tauri v2, Svelte 5, TypeScript |
-| Charts | Apache ECharts |
-| Web Server | Axum, tower-http |
-| Discord | Serenity |
-| CI/CD | GitHub Actions |
-| Deploy | Docker, EC2 |
+| Layer      | Technology                     |
+| ---------- | ------------------------------ |
+| Core       | Rust, Tokio, SeaORM, SQLite    |
+| Desktop    | Tauri v2, Svelte 5, TypeScript |
+| Charts     | Apache ECharts                 |
+| Web Server | Axum, tower-http               |
+| Discord    | Serenity                       |
+| CI/CD      | GitHub Actions                 |
+| Deploy     | Docker, EC2                    |
 
 ## Quick Start
 
 ### Use the Web Dashboard
+
 Visit [vrcdevs.com](https://vrcdevs.com)
 
 ### Download Desktop App
+
 [Latest Release](https://github.com/Hebububu/VRCPulse/releases/latest) - macOS (.dmg), Windows (.exe), Linux (.deb, .rpm, .AppImage)
 
 > **macOS**: After installing, run `xattr -cr /Applications/VRCPulse.app` in Terminal to bypass Gatekeeper (unsigned app).
 
 ### Add Discord Bot
+
 [Add to Discord](https://discord.com/oauth2/authorize?client_id=1456912795462275166&permissions=49152&scope=bot%20applications.commands)
 
 ### Self-Host
