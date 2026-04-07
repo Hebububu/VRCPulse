@@ -16,17 +16,15 @@ use tracing::info;
 use crate::infrastructure::config::Config;
 use crate::infrastructure::error::Result;
 use crate::infrastructure::state::{AppState, AppStateKey};
-use vrcpulse_core::{DatabaseConfig, VrcPulseService, collector, connect_database};
+use vrcpulse_core::{DatabaseConfig, VrcPulseService, connect_database};
 
 /// Set up and configure the Discord bot client
 ///
 /// This function handles all initialization:
-/// - Database connection
-/// - Collector config initialization
-/// - HTTP client creation
-/// - Background collector task spawning
+/// - Database connection and migrations
 /// - Discord client configuration
 ///
+/// The bot is a pure data consumer. The web server handles data collection.
 /// Returns a configured `Client` ready to be started.
 pub async fn setup(config: &Config) -> Result<Client> {
     // 1. Connect to database with shared factory
@@ -34,21 +32,18 @@ pub async fn setup(config: &Config) -> Result<Client> {
     let database = connect_database(db_config).await?;
     info!("Database connected (WAL mode enabled)");
 
-    // 2. Initialize collector config
-    let (config_tx, config_rx) = collector::config::init(&database)
+    // 2. Run migrations
+    use sea_orm_migration::MigratorTrait;
+    migration::Migrator::up(&database, None)
         .await
-        .expect("Failed to load collector config from database");
-    info!("Collector config loaded");
+        .expect("Failed to run migrations");
+    info!("Migrations applied");
 
     // 3. Create VrcPulseService and AppState
     let service = VrcPulseService::new(database.clone());
-    let app_state = Arc::new(RwLock::new(AppState::new(service, config_tx)));
+    let app_state = Arc::new(RwLock::new(AppState::new(service)));
 
-    // 4. Start data collector in background
-    let http_client = create_http_client();
-    tokio::spawn(collector::start(http_client, database, config_rx, None));
-
-    // 5. Configure Discord client
+    // 4. Configure Discord client
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_PRESENCES
@@ -62,23 +57,11 @@ pub async fn setup(config: &Config) -> Result<Client> {
         .event_handler(handler)
         .await?;
 
-    // 6. Store AppState in TypeMap
+    // 5. Store AppState in TypeMap
     {
         let mut data = client.data.write().await;
         data.insert::<AppStateKey>(app_state);
     }
 
     Ok(client)
-}
-
-/// Create HTTP client for API requests
-fn create_http_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .user_agent(concat!(
-            env!("CARGO_PKG_NAME"),
-            "/",
-            env!("CARGO_PKG_VERSION")
-        ))
-        .build()
-        .expect("Failed to create HTTP client")
 }

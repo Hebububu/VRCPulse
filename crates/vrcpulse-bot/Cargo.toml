@@ -20,6 +20,9 @@ tokio = { version = "1.48.0", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
-[dev-dependencies]
-migration = { path = "../../migration" }
-sea-orm-migration = { version = "1.1", features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
+[dependencies.migration]
+path = "../../migration"
+
+[dependencies.sea-orm-migration]
+version = "1.1"
+features = ["runtime-tokio-rustls", "sqlx-sqlite"]

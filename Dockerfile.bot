@@ -1,0 +1,74 @@
+# ==============================================================================
+# VRCPulse Discord Bot - Production Dockerfile
+# ==============================================================================
+
+# Stage 1: Build Rust binary
+FROM rust:1.91-slim-bookworm AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    libsqlite3-dev \
+    libfontconfig1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace manifests for dependency caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates/vrcpulse-core/Cargo.toml crates/vrcpulse-core/
+COPY crates/vrcpulse-bot/Cargo.toml crates/vrcpulse-bot/
+COPY crates/vrcpulse-server/Cargo.toml crates/vrcpulse-server/
+COPY migration/Cargo.toml migration/
+COPY desktop/src-tauri/Cargo.toml desktop/src-tauri/
+
+# Create stub sources for all workspace members so cargo can resolve deps
+RUN mkdir -p crates/vrcpulse-core/src && echo "" > crates/vrcpulse-core/src/lib.rs \
+    && mkdir -p crates/vrcpulse-bot/src && echo "fn main() {}" > crates/vrcpulse-bot/src/main.rs \
+    && mkdir -p crates/vrcpulse-server/src && echo "fn main() {}" > crates/vrcpulse-server/src/main.rs \
+    && mkdir -p migration/src && echo "" > migration/src/lib.rs \
+    && mkdir -p desktop/src-tauri/src && echo "fn main() {}" > desktop/src-tauri/src/main.rs \
+    && touch desktop/src-tauri/build.rs
+
+# Build dependencies only
+RUN cargo build --release -p vrcpulse-bot 2>/dev/null || true
+RUN rm -rf crates/ migration/ desktop/
+
+# Copy actual source code
+COPY crates/ ./crates/
+COPY migration/ ./migration/
+COPY desktop/src-tauri/Cargo.toml desktop/src-tauri/
+COPY desktop/src-tauri/src/ desktop/src-tauri/src/
+COPY desktop/src-tauri/build.rs desktop/src-tauri/
+
+# Touch main.rs to invalidate cache and rebuild
+RUN touch crates/vrcpulse-bot/src/main.rs
+
+# Build release binary
+RUN cargo build --release -p vrcpulse-bot
+
+# ==============================================================================
+# Stage 2: Runtime
+# ==============================================================================
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libsqlite3-0 \
+    fontconfig \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv
+
+COPY --from=builder /app/target/release/vrcpulse-bot ./vrcpulse-bot
+
+RUN mkdir -p /data
+
+ENV DATABASE_URL=sqlite:///data/vrcpulse.db?mode=rwc
+ENV RUST_LOG=info,vrcpulse=info
+
+VOLUME ["/data"]
+
+CMD ["./vrcpulse-bot"]

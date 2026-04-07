@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use vrcpulse_core::{CollectorConfigTx, VrcPulseService};
+use vrcpulse_core::VrcPulseService;
 
 /// TypeMap key for AppState access
 pub struct AppStateKey;
@@ -20,8 +20,6 @@ pub struct AppState {
     /// Shared service for data queries (metrics, status, incidents)
     /// Also provides `db_ref()` for bot-specific table access
     pub service: VrcPulseService,
-    /// Collector config sender for dynamic interval updates
-    pub collector_config: CollectorConfigTx,
     /// Bot startup timestamp
     pub started_at: DateTime<Utc>,
     /// Guilds awaiting intro message (failed to send on join)
@@ -32,10 +30,9 @@ pub struct AppState {
 
 impl AppState {
     /// Create a new AppState instance
-    pub fn new(service: VrcPulseService, collector_config: CollectorConfigTx) -> Self {
+    pub fn new(service: VrcPulseService) -> Self {
         Self {
             service,
-            collector_config,
             started_at: Utc::now(),
             pending_intros: HashSet::new(),
             intro_sent_guilds: HashSet::new(),

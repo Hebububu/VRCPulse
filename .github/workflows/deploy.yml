@@ -1,4 +1,4 @@
-name: Deploy Web
+name: Deploy
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -9,37 +9,53 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     env:
       GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+      DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build web Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.web
           load: true
           tags: vrcpulse-web:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
-      - name: Save Docker image
+      - name: Build bot Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.bot
+          load: true
+          tags: vrcpulse-bot:latest
+          cache-from: type=gha,scope=bot
+          cache-to: type=gha,mode=max,scope=bot
+
+      - name: Save Docker images
         run: |
           docker save vrcpulse-web:latest | gzip > vrcpulse-web.tar.gz
+          docker save vrcpulse-bot:latest | gzip > vrcpulse-bot.tar.gz
 
-      - name: Copy image to EC2
+      - name: Copy images and compose file to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: vrcpulse-web.tar.gz
+          source: "vrcpulse-web.tar.gz,vrcpulse-bot.tar.gz,docker-compose.prod.yml"
           target: /tmp/
 
       - name: Deploy on EC2
@@ -48,26 +64,46 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GOOGLE_AI_STUDIO_API_KEY
+          envs: GOOGLE_AI_STUDIO_API_KEY,DISCORD_TOKEN
           script: |
-            # Load new image
+            set -e
+            trap 'rm -f /tmp/.env' EXIT
+
+            # Install prerequisites if missing
+            docker compose version >/dev/null 2>&1 || sudo apt-get install -y docker-compose-plugin
+            command -v jq >/dev/null 2>&1 || sudo apt-get install -y jq
+
+            # Set up durable compose directory
+            sudo mkdir -p /opt/vrcpulse
+            sudo cp /tmp/docker-compose.prod.yml /opt/vrcpulse/docker-compose.prod.yml
+
+            # Load new images
             docker load < /tmp/vrcpulse-web.tar.gz
-            rm -f /tmp/vrcpulse-web.tar.gz
+            docker load < /tmp/vrcpulse-bot.tar.gz
+            rm -f /tmp/vrcpulse-web.tar.gz /tmp/vrcpulse-bot.tar.gz
 
-            # Stop old container if running
-            docker stop vrcpulse-web 2>/dev/null || true
-            docker rm vrcpulse-web 2>/dev/null || true
+            # Write secrets to temp .env
+            cat > /tmp/.env <<EOF
+            DISCORD_TOKEN=${DISCORD_TOKEN}
+            GOOGLE_AI_STUDIO_API_KEY=${GOOGLE_AI_STUDIO_API_KEY}
+            EOF
 
-            # Start new container
-            docker run -d \
-              --name vrcpulse-web \
-              --restart unless-stopped \
-              -p 80:80 \
-              -v vrcpulse-data:/data \
-              -e GOOGLE_AI_STUDIO_API_KEY="${GOOGLE_AI_STUDIO_API_KEY}" \
-              vrcpulse-web:latest
+            # Stop old bare container if it exists (one-time migration)
+            docker stop vrcpulse-web 2>/dev/null && docker rm vrcpulse-web 2>/dev/null || true
+
+            # Deploy with compose
+            cd /opt/vrcpulse
+            docker compose --env-file /tmp/.env -f docker-compose.prod.yml up -d
+
+            # Post-deploy verification
+            sleep 5
+            FAILED=$(docker compose -f docker-compose.prod.yml ps --format json | jq -r 'select(.State != "running") | .Service')
+            if [ -n "$FAILED" ]; then
+              echo "DEPLOY FAILED: services not running: $FAILED"
+              docker compose -f docker-compose.prod.yml logs --tail 30
+              exit 1
+            fi
+            echo "Deploy successful: both services running"
 
             # Clean up old images
             docker image prune -f
-
-            echo "Deployed successfully"

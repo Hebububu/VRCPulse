@@ -1,10 +1,9 @@
 # TODOS
 
-## Migration Ownership _(partially done)_
+## Migration Ownership _(done)_
 **What:** Each binary (bot, server, desktop) must run `Migrator::up()` on startup against its local SQLite database.
 **Why:** Entities live in `vrcpulse-core` but each deployment has its own SQLite file. Without explicit migration-on-startup, schema drift between deployments is possible.
-**Status:** Server calls `Migrator::up()` in `main.rs`. Bot does **not** — needs to add migration call in `discord::setup()`. Desktop has no local DB so N/A unless self-contained mode is added.
-**Remaining:** Add `Migrator::up()` to bot startup.
+**Status:** Both server (`main.rs`) and bot (`discord::setup()`) now call `Migrator::up()` on startup. Desktop has no local DB so N/A unless self-contained mode is added.
 
 ## Axum Query Timeout _(partially done)_
 **What:** Add explicit query timeout for SQLite reads in the Axum web server.
@@ -23,10 +22,10 @@
 **Why:** 9+ frontend components/pages have no automated tests. InsightCard locale switching, MaintenanceBanner conditional render, filter behavior all rely on manual QA.
 **Status:** Not started. No vitest config, no @testing-library/svelte dependency, no test files.
 
-## Bot CI/CD Pipeline
+## Bot CI/CD Pipeline _(done)_
 **What:** Add GitHub Actions workflow and update Dockerfile for `vrcpulse-bot` crate deployment.
-**Why:** Root `Dockerfile` is outdated — references old single-crate `src/main.rs` layout, not the current workspace structure under `crates/vrcpulse-bot/`. Bot has no automated deploy pipeline.
-**Status:** Not started. Need to update `Dockerfile` for workspace build and add a deploy workflow (similar to `deploy.yml` for web server).
+**Why:** Root `Dockerfile` was outdated — referenced old single-crate `src/main.rs` layout.
+**Status:** Done. `Dockerfile.bot` created, `docker-compose.prod.yml` manages both web + bot, `deploy.yml` updated for compose-based deploys with post-deploy verification. Old root `Dockerfile` deleted. Bot collector removed (server is single data collector).
 
 ## Mobile QA Test Automation
 **What:** Playwright mobile viewport test automation (390x844).

@@ -1,0 +1,34 @@
+services:
+  web:
+    image: vrcpulse-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "80:80"
+    environment:
+      - DATABASE_URL=sqlite:///data/vrcpulse.db?mode=rwc
+      - GOOGLE_AI_STUDIO_API_KEY=${GOOGLE_AI_STUDIO_API_KEY}
+      - RUST_LOG=info,vrcpulse=info
+      - PORT=80
+    volumes:
+      - vrcpulse-data:/data
+    restart: unless-stopped
+
+  bot:
+    image: vrcpulse-bot:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    environment:
+      - DATABASE_URL=sqlite:///data/vrcpulse.db?mode=rwc
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - RUST_LOG=info,vrcpulse=info
+    volumes:
+      - vrcpulse-data:/data
+    restart: unless-stopped
+
+volumes:
+  vrcpulse-data:
+    external: true
+    name: vrcpulse-data
