@@ -69,9 +69,9 @@ jobs:
             set -e
             trap 'rm -f /tmp/.env' EXIT
 
-            # Install prerequisites if missing
-            docker compose version >/dev/null 2>&1 || sudo apt-get install -y docker-compose-plugin
-            command -v jq >/dev/null 2>&1 || sudo apt-get install -y jq
+            # Install prerequisites if missing (Amazon Linux uses yum)
+            docker compose version >/dev/null 2>&1 || sudo yum install -y docker-compose-plugin
+            command -v jq >/dev/null 2>&1 || sudo yum install -y jq
 
             # Set up durable compose directory
             sudo mkdir -p /opt/vrcpulse
