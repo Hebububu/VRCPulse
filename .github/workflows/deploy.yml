@@ -69,8 +69,13 @@ jobs:
             set -e
             trap 'rm -f /tmp/.env' EXIT
 
-            # Install prerequisites if missing (Amazon Linux uses yum)
-            docker compose version >/dev/null 2>&1 || sudo yum install -y docker-compose-plugin
+            # Install prerequisites if missing (Amazon Linux 2023)
+            if ! docker compose version >/dev/null 2>&1; then
+              DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+              sudo mkdir -p $DOCKER_CONFIG/cli-plugins
+              sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose
+              sudo chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+            fi
             command -v jq >/dev/null 2>&1 || sudo yum install -y jq
 
             # Set up durable compose directory
