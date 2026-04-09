@@ -72,7 +72,7 @@ Monitor VRChat server status, API latency, error rates, and incident history wit
 
 ### Use the Web Dashboard
 
-Visit [vrcdevs.com](https://vrcdevs.com)
+Visit [vrpulse.vrcdevs.com](https://vrcpulse.vrcdevs.com)
 
 ### Download Desktop App
 
