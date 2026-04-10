@@ -243,7 +243,11 @@ pub fn bucket_component_history(
 
             let mut buckets = vec!["unknown".to_string(); bucket_count];
 
-            for entry in &entries {
+            // Sort entries by timestamp so we can forward-fill correctly
+            let mut sorted_entries = entries.clone();
+            sorted_entries.sort_by_key(|e| e.source_timestamp);
+
+            for entry in &sorted_entries {
                 let offset = (entry.source_timestamp - range_start).num_seconds() as f64;
                 let idx = (offset / bucket_duration) as usize;
                 if idx < bucket_count {
@@ -253,6 +257,19 @@ pub fn bucket_component_history(
                     {
                         buckets[idx] = entry.status.clone();
                     }
+                }
+            }
+
+            // Forward-fill: if a bucket is "unknown", carry forward the last
+            // known status. VRChat's status API only updates `updated_at` on
+            // actual changes, so gaps between updates mean the status was
+            // unchanged — not missing.
+            let mut last_known: Option<String> = None;
+            for bucket in buckets.iter_mut() {
+                if *bucket != "unknown" {
+                    last_known = Some(bucket.clone());
+                } else if let Some(ref status) = last_known {
+                    *bucket = status.clone();
                 }
             }
 
@@ -432,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bucket_gaps_are_unknown() {
+    fn test_bucket_gaps_forward_filled() {
         let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
         let end = start + Duration::hours(24);
 
@@ -447,8 +464,30 @@ mod tests {
 
         let result = bucket_component_history(&history, &latest, start, end, 90);
         assert_eq!(result[0].buckets[0], "operational");
-        // All other buckets should be "unknown"
-        assert!(result[0].buckets[1..].iter().all(|b| b == "unknown"));
+        // Forward-fill: all subsequent buckets inherit "operational"
+        assert!(result[0].buckets.iter().all(|b| b == "operational"));
+    }
+
+    #[test]
+    fn test_bucket_gaps_before_first_entry_remain_unknown() {
+        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = start + Duration::hours(24);
+        let bucket_duration_secs = (24 * 3600) / 90;
+
+        // Entry in bucket 5 only
+        let history = vec![make_component_log(
+            "c1",
+            "API",
+            "operational",
+            start + Duration::seconds(bucket_duration_secs as i64 * 5 + 10),
+        )];
+        let latest = vec![make_component_log("c1", "API", "operational", end)];
+
+        let result = bucket_component_history(&history, &latest, start, end, 90);
+        // Buckets 0-4 have no prior data, remain unknown
+        assert!(result[0].buckets[..5].iter().all(|b| b == "unknown"));
+        // Bucket 5 onward should be "operational" (forward-filled)
+        assert!(result[0].buckets[5..].iter().all(|b| b == "operational"));
     }
 
     #[test]
